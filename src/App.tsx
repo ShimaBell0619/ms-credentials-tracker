@@ -29,7 +29,10 @@ export function App() {
       <main id="top" className="page-content">
         <section className="page-heading" aria-labelledby="page-title">
           <div>
-            <h1 id="page-title">資格の更新時期を、ひと目で。</h1>
+            <h1 id="page-title">
+              <span className="heading-phrase">資格の更新時期を、</span>
+              <span className="heading-phrase">ひと目で。</span>
+            </h1>
             <p>取得から次の更新まで、Microsoft資格の記録。</p>
           </div>
           <p className="sample-date">

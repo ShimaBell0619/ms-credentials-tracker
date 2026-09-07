@@ -36,7 +36,9 @@ Local `npm ci --ignore-scripts`, lint, typecheck and production build passed. Th
 
 The original E2E assertions remain and now capture 1440px/390px screenshots. Added checks cover 1440px, 390px and 320px, overflow, visible renewal deadline, credential dates and status, calendar meaning, keyboard skip, anchor target and visible focus. The reusable Foundation CI stays enabled. A separate evidence job is necessary because the pinned reusable workflow has no artifact-upload hook; it reruns the E2E suite and retains review screenshots for seven days without changing Foundation gates.
 
-Final CI and screenshot results are reported in the accompanying ChatGPT review after inspection.
+Validation of implementation commit `4380c10` passed in [CI run 34140685427](https://github.com/ShimaBell0619/ms-credentials-tracker/actions/runs/34140685427): lint, typecheck, build and all four E2E tests, including the existing smoke test. The evidence job and Pages publish also passed. Desktop (1440px), mobile (390px), narrow (320px), and focused-record images were downloaded and inspected. All record dates and statuses remained readable; no horizontal overflow was observed or measured.
+
+The image review caught two typography issues, corrected in the follow-up: a stranded Japanese headline suffix on mobile, and Linux's Japanese serif fallback. Phrase spans now preserve natural breaks, and the system font stack explicitly includes Noto Sans JP/CJK and IPAGothic. The existing headline text is unchanged. Final verification is reported in the accompanying ChatGPT review.
 
 ## Remaining scope
 
