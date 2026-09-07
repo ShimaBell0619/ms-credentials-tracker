@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      issues: write
       pages: write
       id-token: write
     environment:
@@ -64,12 +65,45 @@ jobs:
       - name: Build Pages target
         run: npx vite build --base="${{ steps.target.outputs.base }}"
 
+      - name: Install Chromium for PR review images
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture PR review images
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          REVIEW_DIR: ${{ runner.temp }}/ui-preview
+          REVIEW_URL: http://127.0.0.1:4174/
+        run: |
+          set -euo pipefail
+          mkdir -p "$REVIEW_DIR"
+          npm run dev -- --host 127.0.0.1 --port 4174 >"$RUNNER_TEMP/vite-review.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for _ in {1..30}; do
+            if curl --fail --silent "$REVIEW_URL" >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != 'true' ]]; then
+            cat "$RUNNER_TEMP/vite-review.log"
+            exit 1
+          fi
+
+          node scripts/capture-pr-preview.mjs
+
       - name: Stage persistent Pages content
         id: stage
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_PATH: ${{ steps.target.outputs.path }}
+          REVIEW_DIR: ${{ runner.temp }}/ui-preview
         run: |
           set -euo pipefail
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
@@ -93,6 +127,11 @@ jobs:
             rm -rf "$publish_dir/$TARGET_PATH"
             mkdir -p "$publish_dir/$TARGET_PATH"
             cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/$TARGET_PATH/"
+
+            if [[ -d "$REVIEW_DIR" ]]; then
+              mkdir -p "$publish_dir/$TARGET_PATH/review"
+              cp -a "$REVIEW_DIR/." "$publish_dir/$TARGET_PATH/review/"
+            fi
 
             if [[ ! -f "$publish_dir/index.html" ]]; then
               {
@@ -128,6 +167,49 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
+      - name: Upsert PR preview comment
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          marker='<!-- ms-credentials-ui-preview -->'
+          short_sha="${HEAD_SHA:0:7}"
+          preview_base="https://${REPO_OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}"
+          body=$(cat <<EOF
+          ${marker}
+          ## UI preview
+
+          [Open interactive preview](${preview_base}/)
+
+          **Mobile · 390px**
+
+          ![Mobile preview](${preview_base}/review/mobile.png?v=${HEAD_SHA})
+
+          <details>
+          <summary>Desktop · 1440px</summary>
+
+          ![Desktop preview](${preview_base}/review/desktop.png?v=${HEAD_SHA})
+          </details>
+
+          Updated for ${short_sha}.
+          EOF
+          )
+
+          comment_id=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | contains("<!-- ms-credentials-ui-preview -->")) | .id' | head -n 1)
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+          fi
+
   cleanup:
     name: Remove closed PR preview
     if: >-
@@ -138,6 +220,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      issues: write
       pages: write
       id-token: write
     environment:
@@ -192,3 +275,20 @@ jobs:
         if: steps.cleanup.outputs.changed == 'true'
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+      - name: Mark PR preview comment closed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          comment_id=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | contains("<!-- ms-credentials-ui-preview -->")) | .id' | head -n 1)
+          if [[ -n "$comment_id" ]]; then
+            body='<!-- ms-credentials-ui-preview -->
+          ## UI preview
+
+          Preview removed because this pull request is closed.'
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          fi
