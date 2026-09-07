@@ -27,6 +27,17 @@ Viteは本番では`/ms-credentials-tracker/`、PRでは`/ms-credentials-tracker
 
 最初のmain publish前にPR previewだけが存在する場合は、Pages rootにpreviewへの簡易indexを配置します。mainが公開された後はrootが本番になり、開いている`pr-*` previewは維持されます。
 
+## PR review images
+
+same-repository PRのpublishでは、Pages workflowがChromiumでレビュー用画像を取得します。
+
+- mobile: 390px幅
+- desktop: 1440px幅
+
+画像はpreview本体と同じ`pr-<number>/review/`へ公開します。PR Conversationには専用コメントを1件だけ作成し、mobile画像をインライン表示、desktop画像を折りたたみ表示します。PR更新時は同じコメントを更新するため、コメントは増殖しません。
+
+PR close時はpreview本体と画像を削除し、同じコメントをclosed表示へ更新します。GitHub Actions artifactはUI確認の主導線として使用しません。
+
 ## Security boundary
 
 privileged publish jobはsame-repository PRだけを対象とし、fork PRは除外します。通常のWeb App Foundation CIはPages公開とは独立しており、application変更のquality gateとして維持します。
