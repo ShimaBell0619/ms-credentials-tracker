@@ -6,186 +6,189 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
 
-permissions:
-  contents: write
-  pages: write
-
 concurrency:
-  group: pages-publish
+  group: pages-site-publish
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Publish Pages site
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.action != 'closed' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'github-pages-preview' || 'github-pages' }}
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Node.js
-        if: github.event_name != 'pull_request' || github.event.action != 'closed'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Build static site
-        if: github.event_name != 'pull_request' || github.event.action != 'closed'
-        run: |
-          npm ci
-          npm run build
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Prepare gh-pages worktree
-        shell: bash
-        run: |
-          set -euo pipefail
-          pages_dir="$RUNNER_TEMP/pages-site"
-          rm -rf "$pages_dir"
-
-          if git fetch origin "refs/heads/gh-pages:refs/remotes/origin/gh-pages"; then
-            git worktree add --detach "$pages_dir" refs/remotes/origin/gh-pages
-          else
-            git worktree add --detach "$pages_dir" HEAD
-            git -C "$pages_dir" switch --orphan gh-pages
-            find "$pages_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          fi
-
-          echo "PAGES_DIR=$pages_dir" >> "$GITHUB_ENV"
-
-      - name: Update published files
+      - name: Resolve Pages target
+        id: target
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-
           if [[ "$EVENT_NAME" == 'pull_request' ]]; then
-            target="$PAGES_DIR/pr-$PR_NUMBER"
-            rm -rf "$target"
-            if [[ "$EVENT_ACTION" != 'closed' ]]; then
-              mkdir -p "$target"
-              cp -a dist/. "$target/"
-            fi
+            echo "base=/ms-credentials-tracker/pr-${PR_NUMBER}/" >> "$GITHUB_OUTPUT"
+            echo "path=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           else
-            find "$PAGES_DIR" -mindepth 1 -maxdepth 1 \
-              ! -name .git \
-              ! -name 'pr-*' \
-              -exec rm -rf {} +
-            cp -a dist/. "$PAGES_DIR/"
-            touch "$PAGES_DIR/.production"
+            echo "base=/ms-credentials-tracker/" >> "$GITHUB_OUTPUT"
+            echo "path=." >> "$GITHUB_OUTPUT"
           fi
 
-          touch "$PAGES_DIR/.nojekyll"
+      - name: Build Pages target
+        run: npx vite build --base="${{ steps.target.outputs.base }}"
 
-          if [[ ! -f "$PAGES_DIR/.production" ]]; then
-            {
-              printf '%s\n' '<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MS Credentials Tracker previews</title><body><main><h1>MS Credentials Tracker previews</h1><ul>'
-              for preview in "$PAGES_DIR"/pr-*; do
-                [[ -d "$preview" ]] || continue
-                name="$(basename "$preview")"
-                printf '<li><a href="./%s/">%s</a></li>\n' "$name" "$name"
-              done
-              printf '%s\n' '</ul></main></body></html>'
-            } > "$PAGES_DIR/index.html"
-          fi
-
-      - name: Commit published files
-        id: publish
+      - name: Stage persistent Pages content
+        id: stage
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
+          GH_TOKEN: ${{ github.token }}
+          TARGET_PATH: ${{ steps.target.outputs.path }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish_dir="${RUNNER_TEMP}/pages-content"
+          deploy_dir="${RUNNER_TEMP}/pages-deploy"
+
+          if git ls-remote --exit-code "$remote" refs/heads/pages-content >/dev/null 2>&1; then
+            git clone --depth 1 --branch pages-content "$remote" "$publish_dir"
+          else
+            mkdir -p "$publish_dir"
+            git -C "$publish_dir" init -b pages-content
+          fi
+
+          git -C "$publish_dir" config user.name 'github-actions[bot]'
+          git -C "$publish_dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if [[ "$TARGET_PATH" == '.' ]]; then
+            find "$publish_dir" -mindepth 1 -maxdepth 1 ! -name .git ! -name 'pr-*' -exec rm -rf {} +
+            cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/"
+          else
+            rm -rf "$publish_dir/$TARGET_PATH"
+            mkdir -p "$publish_dir/$TARGET_PATH"
+            cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/$TARGET_PATH/"
+
+            if [[ ! -f "$publish_dir/index.html" ]]; then
+              {
+                printf '%s\n' '<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MS Credentials Tracker preview</title><body><main><h1>MS Credentials Tracker preview</h1><p>This root page is temporary until main is published.</p><ul>'
+                for preview in "$publish_dir"/pr-*; do
+                  [[ -d "$preview" ]] || continue
+                  name="$(basename "$preview")"
+                  printf '<li><a href="./%s/">%s</a></li>\n' "$name" "$name"
+                done
+                printf '%s\n' '</ul></main></body></html>'
+              } > "$publish_dir/index.html"
+            fi
+          fi
+
+          touch "$publish_dir/.nojekyll"
+          git -C "$publish_dir" add -A
+          if ! git -C "$publish_dir" diff --cached --quiet; then
+            git -C "$publish_dir" commit -m "chore(pages): publish ${TARGET_PATH}"
+            git -C "$publish_dir" push "$remote" HEAD:pages-content
+          fi
+
+          rm -rf "$deploy_dir"
+          mkdir -p "$deploy_dir"
+          rsync -a --exclude=.git "$publish_dir/" "$deploy_dir/"
+          echo "deploy_dir=$deploy_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ steps.stage.outputs.deploy_dir }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+  cleanup:
+    name: Remove closed PR preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages-preview
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Remove preview from persistent Pages content
+        id: cleanup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          git -C "$PAGES_DIR" config user.name 'github-actions[bot]'
-          git -C "$PAGES_DIR" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C "$PAGES_DIR" add -A
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish_dir="${RUNNER_TEMP}/pages-content"
+          deploy_dir="${RUNNER_TEMP}/pages-deploy"
 
-          if git -C "$PAGES_DIR" diff --cached --quiet; then
+          if ! git ls-remote --exit-code "$remote" refs/heads/pages-content >/dev/null 2>&1; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
-            if [[ "$EVENT_ACTION" == 'closed' ]]; then
-              message="pages: remove PR #$PR_NUMBER preview"
-            else
-              message="pages: publish PR #$PR_NUMBER preview"
-            fi
-          else
-            message='pages: publish main'
-          fi
-
-          git -C "$PAGES_DIR" commit -m "$message"
-          git -C "$PAGES_DIR" push origin HEAD:gh-pages
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
-
-      - name: Verify Pages publishing source
-        id: pages
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          response="$RUNNER_TEMP/pages-site.json"
-          status="$(curl -sS -o "$response" -w '%{http_code}' \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2026-03-10' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages")"
-
-          if [[ "$status" == '404' ]]; then
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::GitHub Pages is not configured. Set Settings > Pages > Deploy from a branch > gh-pages > /(root).'
+          git clone --depth 1 --branch pages-content "$remote" "$publish_dir"
+          git -C "$publish_dir" config user.name 'github-actions[bot]'
+          git -C "$publish_dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          target="pr-${PR_NUMBER}"
+          if [[ ! -d "$publish_dir/$target" ]]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [[ "$status" != '200' ]]; then
-            cat "$response"
-            echo "Unexpected Pages configuration response: HTTP $status" >&2
-            exit 1
-          fi
+          rm -rf "$publish_dir/$target"
+          git -C "$publish_dir" add -A
+          git -C "$publish_dir" commit -m "chore(pages): remove ${target}"
+          git -C "$publish_dir" push "$remote" HEAD:pages-content
 
-          source_branch="$(jq -r '.source.branch // ""' "$response")"
-          source_path="$(jq -r '.source.path // ""' "$response")"
-          html_url="$(jq -r '.html_url // ""' "$response")"
-          echo "Pages URL: $html_url"
-          echo "Pages source: $source_branch $source_path"
+          rm -rf "$deploy_dir"
+          mkdir -p "$deploy_dir"
+          rsync -a --exclude=.git "$publish_dir/" "$deploy_dir/"
+          echo "deploy_dir=$deploy_dir" >> "$GITHUB_OUTPUT"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
 
-          if [[ "$source_branch" == 'gh-pages' && "$source_path" == '/' ]]; then
-            echo 'configured=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo "::warning::Pages source is '${source_branch}${source_path}', not 'gh-pages /'. Change Settings > Pages to Deploy from a branch > gh-pages > /(root)."
-          fi
+      - name: Upload cleaned Pages artifact
+        if: steps.cleanup.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ steps.cleanup.outputs.deploy_dir }}
 
-      - name: Request GitHub Pages build
-        if: steps.pages.outputs.configured == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          response="$RUNNER_TEMP/pages-build-response.json"
-          status="$(curl -sS -o "$response" -w '%{http_code}' \
-            -X POST \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2026-03-10' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds")"
-
-          if [[ "$status" != '201' ]]; then
-            cat "$response"
-            echo "Unexpected Pages build response: HTTP $status" >&2
-            exit 1
-          fi
-
-          cat "$response"
+      - name: Deploy cleaned Pages site
+        if: steps.cleanup.outputs.changed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
