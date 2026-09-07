@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
   pages: write
 
 concurrency:
@@ -68,11 +67,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
             target="$PAGES_DIR/pr-$PR_NUMBER"
             rm -rf "$target"
-
-            if [[ "$EVENT_ACTION" != "closed" ]]; then
+            if [[ "$EVENT_ACTION" != 'closed' ]]; then
               mkdir -p "$target"
               cp -a dist/. "$target/"
             fi
@@ -117,8 +115,8 @@ jobs:
             exit 0
           fi
 
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            if [[ "$EVENT_ACTION" == "closed" ]]; then
+          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
+            if [[ "$EVENT_ACTION" == 'closed' ]]; then
               message="pages: remove PR #$PR_NUMBER preview"
             else
               message="pages: publish PR #$PR_NUMBER preview"
@@ -131,8 +129,47 @@ jobs:
           git -C "$PAGES_DIR" push origin HEAD:gh-pages
           echo 'changed=true' >> "$GITHUB_OUTPUT"
 
+      - name: Verify Pages publishing source
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          response="$RUNNER_TEMP/pages-site.json"
+          status="$(curl -sS -o "$response" -w '%{http_code}' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages")"
+
+          if [[ "$status" == '404' ]]; then
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::GitHub Pages is not configured. Set Settings > Pages > Deploy from a branch > gh-pages > /(root).'
+            exit 0
+          fi
+
+          if [[ "$status" != '200' ]]; then
+            cat "$response"
+            echo "Unexpected Pages configuration response: HTTP $status" >&2
+            exit 1
+          fi
+
+          source_branch="$(jq -r '.source.branch // ""' "$response")"
+          source_path="$(jq -r '.source.path // ""' "$response")"
+          html_url="$(jq -r '.html_url // ""' "$response")"
+          echo "Pages URL: $html_url"
+          echo "Pages source: $source_branch $source_path"
+
+          if [[ "$source_branch" == 'gh-pages' && "$source_path" == '/' ]]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo "::warning::Pages source is '${source_branch}${source_path}', not 'gh-pages /'. Change Settings > Pages to Deploy from a branch > gh-pages > /(root)."
+          fi
+
       - name: Request GitHub Pages build
-        if: steps.publish.outputs.changed == 'true'
+        if: steps.publish.outputs.changed == 'true' && steps.pages.outputs.configured == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -146,61 +183,10 @@ jobs:
             -H 'X-GitHub-Api-Version: 2026-03-10' \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds")"
 
-          if [[ "$status" == '201' ]]; then
+          if [[ "$status" != '201' ]]; then
             cat "$response"
-            exit 0
-          fi
-
-          if [[ "$status" == '404' ]]; then
-            echo '::warning::gh-pages is staged, but GitHub Pages is not configured yet. Set Settings > Pages > Deploy from a branch > gh-pages > /(root).'
-            exit 0
+            echo "Unexpected Pages build response: HTTP $status" >&2
+            exit 1
           fi
 
           cat "$response"
-          echo "Unexpected Pages build response: HTTP $status" >&2
-          exit 1
-
-      - name: Update PR preview comment
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          EVENT_ACTION: ${{ github.event.action }}
-        run: |
-          set -euo pipefail
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo="${GITHUB_REPOSITORY#*/}"
-          preview_url="https://${owner}.github.io/${repo}/pr-${PR_NUMBER}/"
-          marker='<!-- pages-preview -->'
-
-          if [[ "$EVENT_ACTION" == 'closed' ]]; then
-            body="$marker\n### GitHub Pages preview\nPR #${PR_NUMBER} preview removed."
-          else
-            body="$marker\n### GitHub Pages preview\n[Open PR #${PR_NUMBER} preview](${preview_url})\n\nSource: \`${GITHUB_SHA}\`"
-          fi
-
-          comments="$(curl -fsSL \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2026-03-10' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100")"
-
-          comment_id="$(printf '%s' "$comments" | jq -r --arg marker "$marker" '.[] | select(.user.login == "github-actions[bot]" and (.body | contains($marker))) | .id' | head -n 1)"
-          payload="$(jq -n --arg body "$(printf '%b' "$body")" '{body: $body}')"
-
-          if [[ -n "$comment_id" && "$comment_id" != 'null' ]]; then
-            curl -fsSL -X PATCH \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H 'X-GitHub-Api-Version: 2026-03-10' \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
-              -d "$payload" >/dev/null
-          else
-            curl -fsSL -X POST \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H 'X-GitHub-Api-Version: 2026-03-10' \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
-              -d "$payload" >/dev/null
-          fi
