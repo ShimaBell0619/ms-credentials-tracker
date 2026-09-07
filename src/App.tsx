@@ -35,12 +35,12 @@ function CredentialMark({ credential }: { credential: MockCredential }) {
 }
 
 const calendarDays = [
-  null, 1, 2, 3, 4, 5, 6,
+  'leading', 1, 2, 3, 4, 5, 6,
   7, 8, 9, 10, 11, 12, 13,
   14, 15, 16, 17, 18, 19, 20,
   21, 22, 23, 24, 25, 26, 27,
   28, 29, 30,
-];
+] as const;
 
 export function App() {
   return (
@@ -112,7 +112,14 @@ export function App() {
             <p className="section-kicker">NEXT RENEWAL</p>
             <h2 id="renewal-title">Azure Administrator Associate</h2>
             <p className="renewal-meta">取得日 2025/10/19 · 有効期限 2026/10/19</p>
-            <div className="renewal-progress" aria-label="有効期限までの期間イメージ">
+            <div
+              className="renewal-progress"
+              role="progressbar"
+              aria-label="有効期限までの期間イメージ"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={84}
+            >
               <span style={{ width: '84%' }} />
             </div>
             <div className="renewal-scale" aria-hidden="true">
@@ -169,9 +176,9 @@ export function App() {
                 {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day}>{day}</span>)}
               </div>
               <div className="calendar-grid">
-                {calendarDays.map((day, index) => {
-                  if (day === null) {
-                    return <span className="calendar-day calendar-day--empty" key={`empty-${index}`} />;
+                {calendarDays.map((day) => {
+                  if (day === 'leading') {
+                    return <span className="calendar-day calendar-day--empty" key="leading" />;
                   }
                   const isToday = day === 7;
                   const hasEvent = day === 15;
