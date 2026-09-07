@@ -17,3 +17,30 @@ jobs:
       run_test: false
       test_opt_out_reason: UI-only mock in Issue #1 has no product logic; browser-rendered smoke validation is enabled instead.
       run_e2e: true
+
+
+  visual-evidence:
+    name: Capture UI review evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:e2e
+      - name: Upload rendered desktop, mobile and focus evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-review-evidence
+          path: test-results/
+          if-no-files-found: error
+          retention-days: 7
