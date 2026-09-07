@@ -107,7 +107,7 @@ export function App() {
               <span>取得</span><span>現在</span><span>期限</span>
             </div>
           </div>
-          <div className="expiry-block" aria-label="期限まで42日">
+          <div className="expiry-block">
             <span className="expiry-label">EXPIRES IN</span>
             <strong>42</strong>
             <span className="expiry-unit">DAYS</span>
@@ -150,7 +150,7 @@ export function App() {
                         <dd>{credential.earnedOn}</dd>
                       </div>
                       <div>
-                        <dt>{credential.expiresOn ? '期限' : '期限'}</dt>
+                        <dt>期限</dt>
                         <dd>{credential.expiresOn ?? 'なし'}</dd>
                       </div>
                     </dl>
