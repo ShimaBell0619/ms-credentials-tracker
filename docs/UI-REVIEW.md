@@ -32,13 +32,15 @@ Scope: static UI, independent design review and implementation; no merge or serv
 
 ## Validation and evidence
 
-Local `npm ci --ignore-scripts`, lint, typecheck and production build passed. The standard E2E command could not install OS dependencies in the local sandbox; Chromium download also timed out. Local browser file/network access was blocked. Required rendered checks therefore run on GitHub Actions, with the existing PR preview used for browser inspection.
+Local `npm ci --ignore-scripts`, lint, typecheck and production build passed. The standard E2E command could not install OS dependencies in the local sandbox; Chromium download also timed out. Local browser file/network access was blocked. Required rendered checks therefore ran on GitHub Actions, with the existing PR preview used for browser inspection.
 
-The original E2E assertions remain and now capture 1440px/390px screenshots. Added checks cover 1440px, 390px and 320px, overflow, visible renewal deadline, credential dates and status, calendar meaning, keyboard skip, anchor target and visible focus. The reusable Foundation CI stays enabled. A separate evidence job is necessary because the pinned reusable workflow has no artifact-upload hook; it reruns the E2E suite and retains review screenshots for seven days without changing Foundation gates.
+The original E2E assertions remain and capture 1440px/390px screenshots during review runs. Added checks cover 1440px, 390px and 320px, overflow, visible renewal deadline, credential dates and status, calendar meaning, keyboard skip, anchor target and visible focus. The reusable Foundation CI remains the permanent quality gate.
 
-Validation of implementation commit `4380c10` passed in [CI run 34140685427](https://github.com/ShimaBell0619/ms-credentials-tracker/actions/runs/34140685427): lint, typecheck, build and all four E2E tests, including the existing smoke test. The evidence job and Pages publish also passed. Desktop (1440px), mobile (390px), narrow (320px), and focused-record images were downloaded and inspected. All record dates and statuses remained readable; no horizontal overflow was observed or measured.
+Validation of implementation commit `4380c10` passed in [CI run 34140685427](https://github.com/ShimaBell0619/ms-credentials-tracker/actions/runs/34140685427): lint, typecheck, build and all four E2E tests, including the existing smoke test. A one-time `ui-review-evidence` artifact was captured during this review and inspected at desktop (1440px), mobile (390px), narrow (320px), and focused-record states. That artifact was review evidence only; the dedicated evidence job is not retained in the permanent CI because it would duplicate install/build/E2E work on every push.
 
-The image review caught two typography issues, corrected in the follow-up: a stranded Japanese headline suffix on mobile, and Linux's Japanese serif fallback. Phrase spans now preserve natural breaks, and the system font stack explicitly includes Noto Sans JP/CJK and IPAGothic. The existing headline text is unchanged. Final verification is reported in the accompanying ChatGPT review.
+The image review caught two typography issues, corrected in the follow-up: a stranded Japanese headline suffix on mobile, and Linux's Japanese serif fallback. Phrase spans now preserve natural breaks, and the system font stack explicitly includes Noto Sans JP/CJK and IPAGothic. The existing headline text is unchanged.
+
+Final HEAD verification remains covered by the normal Foundation CI and Pages preview deployment.
 
 ## Remaining scope
 
