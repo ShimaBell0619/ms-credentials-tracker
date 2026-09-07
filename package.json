@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "check": "biome check .",
+    "check": "biome lint .",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
