@@ -7,7 +7,7 @@
     "dev": "vite",
     "check": "biome lint .",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
+    "build": "vite build && node scripts/verify-pages-build.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright install --with-deps chromium && playwright test"
   },
