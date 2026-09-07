@@ -23,6 +23,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
       pages: write
       id-token: write
     environment:
@@ -221,6 +222,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
       pages: write
       id-token: write
     environment:
