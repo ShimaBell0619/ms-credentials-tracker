@@ -29,13 +29,15 @@ npm run test:e2e
 
 ## GitHub Pages
 
-Pagesの公開物は`gh-pages`ブランチで管理します。
+GitHub Pagesは**GitHub Actions**から公開します。ビルド済みファイルをPagesの公開ブランチとして直接指定する方式は使いません。
 
 - main: `https://shimabell0619.github.io/ms-credentials-tracker/`
 - PR preview: `https://shimabell0619.github.io/ms-credentials-tracker/pr-<number>/`
 
-同一リポジトリのPRは更新のたびに固有の`pr-N` pathへ反映され、Pagesルートのpreview一覧からも識別できます。PR close時はそのpreviewだけ削除します。外部fork PRはprivileged publish対象外です。
+`main` pushではVite buildをPages artifactとしてアップロードし、`actions/deploy-pages`で本番へ反映します。同一リポジトリのPRは一時的な`pr-N` pathへ反映し、PR close時に削除します。fork PRはprivileged publish対象外です。
 
-初回のみRepository Settings > Pagesで`Deploy from a branch`、`gh-pages`、`/(root)`を選択します。workflowは現在のPages sourceも検査し、設定が違う場合は警告します。詳細は`docs/DEPLOYMENT.md`を参照してください。
+PR previewを本番と共存させるため、公開内容の組み立て用に`pages-content`ブランチを内部ストレージとして使います。このブランチ自体はGitHub Pagesのpublishing sourceではありません。
+
+詳細は`docs/DEPLOYMENT.md`を参照してください。
 
 Foundation provenance is recorded in `docs/FOUNDATION.md`.

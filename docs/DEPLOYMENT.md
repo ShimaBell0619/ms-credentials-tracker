@@ -2,34 +2,44 @@
 
 ## Publishing model
 
-Compiled static assets are stored on the `gh-pages` branch.
+GitHub Pagesのpublishing sourceは**GitHub Actions**です。
 
-- `main` publishes to the Pages site root.
-- Same-repository pull requests publish to `pr-<number>/`.
-- Before the first main publish, the Pages root is a small index of available PR previews.
-- Main publishing preserves existing `pr-*` preview directories.
-- Closing a PR removes only that PR directory.
-- Pages publish runs are serialized through one concurrency group to avoid lost updates between previews.
+- `main` pushは本番サイトをPages rootへ公開します。
+- same-repository PRは一時previewを`pr-<number>/`へ公開します。
+- PR close時はそのPRのpreviewだけ削除します。
+- fork PRはprivileged publish対象外です。
+- 公開処理は1つのconcurrency groupで直列化し、同時更新による取りこぼしを防ぎます。
 
-The application uses Vite `base: './'` so generated assets resolve from both the repository Pages path and nested PR preview paths. `npm run build` verifies that the generated HTML does not contain root-absolute local asset URLs.
+Viteは本番では`/ms-credentials-tracker/`、PRでは`/ms-credentials-tracker/pr-<number>/`をbase pathとしてbuildします。
+
+## GitHub Actions flow
+
+本番・PRともに、最終公開はGitHub公式のPages Actionsを使います。
+
+1. sourceをcheckout
+2. `npm ci`
+3. Vite build
+4. Pages公開内容を組み立て
+5. `actions/upload-pages-artifact`
+6. `actions/deploy-pages`
+
+`pages-content`ブランチは、本番と一時PR previewを1つのPages artifactへまとめるための内部ストレージです。GitHub Pagesのpublishing sourceとして直接指定するブランチではありません。
+
+最初のmain publish前にPR previewだけが存在する場合は、Pages rootにpreviewへの簡易indexを配置します。mainが公開された後はrootが本番になり、開いている`pr-*` previewは維持されます。
 
 ## Security boundary
 
-The publish workflow has repository write permissions, so it only publishes pull requests whose head repository is the same repository. Fork pull requests are not executed in the privileged publishing job.
+privileged publish jobはsame-repository PRだけを対象とし、fork PRは除外します。通常のWeb App Foundation CIはPages公開とは独立しており、application変更のquality gateとして維持します。
 
-The normal Foundation CI remains independent from publishing and should stay the quality gate for application changes.
+## Repository setting
 
-## One-time repository setup
+Repository Settings > Pages > Build and deployment > Source は **GitHub Actions** を使用します。
 
-GitHub Pages branch publishing must use:
+現在のworkflowは`actions/upload-pages-artifact`と`actions/deploy-pages`で直接Pages deploymentを作成します。`gh-pages`をpublishing sourceにする設定は不要です。
 
-1. Repository Settings > Pages.
-2. Source: `Deploy from a branch`.
-3. Branch: `gh-pages`.
-4. Folder: `/(root)`.
+## URLs
 
-The workflow reads the current Pages configuration through the GitHub Pages REST API. If the source is missing or points somewhere else, it emits a warning instead of requesting the wrong build.
+- Production: `https://shimabell0619.github.io/ms-credentials-tracker/`
+- PR #N preview: `https://shimabell0619.github.io/ms-credentials-tracker/pr-N/`
 
-The connected GitHub automation available to ChatGPT can write repository files and branches but does not expose the Pages administration mutation needed to change this repository setting directly.
-
-After Pages is configured, the publish workflow explicitly requests a Pages rebuild through the GitHub Pages REST API after each `gh-pages` update. GitHub documents that commits pushed by a workflow `GITHUB_TOKEN` do not themselves trigger a branch-source Pages build, so the explicit build request is intentional.
+PRのDeployment environmentはpreview URLを直接指すため、GitHub上から対象PRの一時画面へ移動できます。
