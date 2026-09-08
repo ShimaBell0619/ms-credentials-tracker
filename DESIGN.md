@@ -17,12 +17,14 @@ The first visual priority is the next deadline. The second is renewal, expiry, a
 
 The page introduction should remain quiet: show the functional title `資格の更新予定` and the sample reference date, then let the deadline record and timeline communicate the date-led concept. Do not explain the design concept with marketing-style hero copy.
 
+Credential import is a supporting workflow, not a new dashboard section. Entry to import may live as a compact header utility action and open a focused dialog so the main schedule hierarchy remains unchanged.
+
 ## Colors
 
 - Neutral paper: warm gray / off-white for a calm schedule and register surface.
 - Azure blue: reserved for current/reference position, renewal-start events, and credential codes where Microsoft context is meaningful.
 - Warning orange: deadlines or states that require attention.
-- Green: active/valid state.
+- Green: active/valid state and confirmed-save feedback.
 - Slate: non-expiring and secondary information.
 - Status meaning must always be available in text; color is never the only signal.
 
@@ -40,12 +42,14 @@ The page introduction should remain quiet: show the functional title `資格の�
 - Use a table for the credential register because comparison across records is a primary task.
 - Mobile: preserve the next deadline first, then transform the table into labeled vertical records.
 - Review at approximately 1440px, 390px, and 320px. Horizontal page overflow is not acceptable.
+- Import/review dialogs must fit narrow/mobile viewports without forcing page-level horizontal scrolling.
 
 ## Elevation and depth
 
 - Do not use shadows as the default hierarchy mechanism.
 - Separate information with borders, rules, background differences, and spacing.
 - Only the next deadline receives the warning top rule and a light deadline surface to indicate priority.
+- A modal backdrop may separate the import task from the schedule, but the dialog itself should keep the same restrained border-based visual language.
 
 ## Shapes
 
@@ -55,19 +59,21 @@ The page introduction should remain quiet: show the functional title `資格の�
 
 ## Components
 
-- Header: product identity, mock-state indicator, and in-page navigation.
+- Header: product identity, mock-state indicator, compact import utility, and in-page navigation.
 - Page introduction: functional title plus sample reference date only; do not repeat the design concept in explanatory hero copy.
 - Next action: date, credential, and remaining days presented as one deadline record.
 - 90-day schedule: visual time axis plus an accessible event list.
 - Credential table: compare credential, earned date, status, and expiry/next action.
 - Calendar: locate current sample-month events. Static mock UI must label the reference date as a sample/reference date rather than "today".
 - Upcoming list: concrete near-term events in chronological order.
+- Transcript import dialog: paste external text, parse into candidates, show matched/unresolved state in text, and require explicit confirmation before browser-local save.
 
 ## Do
 
 - Express the date-led hierarchy through layout, not explanatory copy.
 - Pair deadline/renewal/event type colors with text labels.
 - Review rendered Japanese wrapping, long credential names, focus, and overflow.
+- Make external-data confirmation status explicit in text.
 - After material UI changes, use render → critique → fix → re-render.
 - Require a product, data, workflow, or accessibility reason before adding decorative UI weight.
 
@@ -80,3 +86,4 @@ The page introduction should remain quiet: show the functional title `資格の�
 - Do not give status more visual weight than its information value through pills.
 - Do not imitate the Microsoft Learn UI.
 - Do not explain the date-led design concept with marketing hero copy.
+- Do not let parsed external data appear as confirmed application state before explicit user confirmation.

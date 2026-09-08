@@ -7,6 +7,7 @@
     "dev": "vite",
     "check": "biome lint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/transcript-import.test.ts",
     "build": "vite build",
     "postbuild": "node scripts/verify-pages-build.mjs",
     "preview": "vite preview",

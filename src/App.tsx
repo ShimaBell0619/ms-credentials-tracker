@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { TranscriptImport } from './components/TranscriptImport';
 import { credentials, scheduleEvents, type CredentialStatus } from './mock-data';
 
 const statusClass: Record<CredentialStatus, string> = {
@@ -91,6 +92,7 @@ export default function App() {
         </nav>
 
         <div className="header-meta">
+          <TranscriptImport />
           <span className="mock-label">Mock data</span>
         </div>
       </header>

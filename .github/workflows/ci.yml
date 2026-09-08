@@ -14,8 +14,7 @@ jobs:
     with:
       node_version_file: .node-version
       cache_dependency_path: package-lock.json
-      run_test: false
-      test_opt_out_reason: UI-only mock with no independent domain logic in Issue 4; rendered E2E remains enabled.
+      run_test: true
       run_e2e: true
 
   pages-candidate:
