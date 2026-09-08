@@ -109,6 +109,94 @@ test('parses localized date labels and tolerates PDF column text around a known 
   assert.equal(result.exams[0].passedOn, '2025-11-17');
 });
 
+test('parses the Japanese two-page PDF extraction shape with wrapped cells and summary labels', () => {
+  const transcript = `
+    トランスクリプト
+    モジュールは完了しました 64
+    完了したラーニング パス 20
+    アクティブな認定資格 5
+    合格した試験 7
+    認定資格の履歴 2
+
+    アクティブな認定資格
+    認定資格のタイトル 認定資格番号 取得日 有効期限
+    Microsoft認定資格: Azure管理者アソシエイ
+    ト
+    ADM123-
+    CRED45
+    2023年11月
+    19日
+    2026年11月
+    20日
+    Microsoft 認定: Azure セキュリティ エンジニ
+    ア アソシエイト
+    SEC123-CRED45
+    2025年12月
+    27日
+    2026年12月
+    28日
+    Microsoft 認定: Azure ネットワーク エンジ
+    ニア アソシエイト
+    NET123-CRED45
+    2026年2月
+    23日
+    2027年2月24
+    日
+    Microsoft認定: Azure ソリューション アーキ
+    テクト エキスパート
+    ARC123-
+    CRED45
+    2024年6月
+    28日
+    2027年6月29
+    日
+    Microsoft 認定: Azure Fundamentals FUND12-CRED45
+    2023年7月
+    16日
+    該当なし
+
+    合格した試験
+    試験のタイトル 試験番号 合格日
+    Designing and Implementing Microsoft Azure Networking Solutions AZ-700 2026年2月23日
+    Microsoft Azure Security Technologies AZ-500 2025年12月27
+    日
+    Microsoft DevOpsソリューションの設計と実装 AZ-400 2025年7月26日
+    Developing Solutions for Microsoft Azure AZ-204 2025年1月20日
+    Microsoft Azure インフラストラクチャ ソリューションの設計 AZ-305 2024年6月28日
+    Microsoft Azure Administrator AZ-104 2023年11月19日
+    Microsoft Azure Fundamentals AZ-900 2023年7月16日
+
+    認定資格の履歴
+    Microsoft認定: Example Expired Credential HIST12-CRED45 Expired
+    完了したラーニング パス
+  `;
+
+  const result = parseMicrosoftLearnTranscript(transcript);
+  assert.equal(result.credentials.length, 5);
+  assert.equal(result.credentials.filter((item) => item.matchStatus === 'matched').length, 5);
+  assert.deepEqual(
+    result.credentials.map((item) => item.matchedDefinitionId),
+    [
+      'cert.azure-administrator-associate',
+      'cert.azure-security-engineer-associate',
+      'cert.azure-network-engineer-associate',
+      'cert.azure-solutions-architect-expert',
+      'cert.azure-fundamentals',
+    ],
+  );
+  assert.equal(result.credentials[0].externalNumber, 'ADM123-CRED45');
+  assert.equal(result.credentials[0].earnedOn, '2023-11-19');
+  assert.equal(result.credentials[0].expiresOn, '2026-11-20');
+  assert.equal(result.credentials[4].expiresOn, null);
+
+  assert.equal(result.exams.length, 7);
+  assert.deepEqual(
+    result.exams.map((item) => item.examNumber),
+    ['AZ-700', 'AZ-500', 'AZ-400', 'AZ-204', 'AZ-305', 'AZ-104', 'AZ-900'],
+  );
+  assert.equal(result.exams[1].passedOn, '2025-12-27');
+});
+
 test('keeps unknown credentials unresolved instead of inventing a definition', () => {
   const result = parseMicrosoftLearnTranscript(`
     Active certifications
