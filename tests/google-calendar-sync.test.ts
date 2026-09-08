@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   buildGoogleCalendarDesiredEvents,
   GoogleCalendarApiError,
+  GOOGLE_CALENDAR_EXPIRY_COLOR_ID,
+  GOOGLE_CALENDAR_RENEWAL_COLOR_ID,
   type GoogleCalendarApi,
   type GoogleCalendarDesiredEvent,
   type GoogleCalendarRemoteEvent,
@@ -40,6 +42,7 @@ function remoteFromDesired(
     id,
     summary: desired.summary,
     description: desired.description,
+    colorId: desired.colorId,
     start: desired.start,
     end: desired.end,
     transparency: desired.transparency,
@@ -89,7 +92,7 @@ class FakeCalendarApi implements GoogleCalendarApi {
   }
 }
 
-test('projects two all-day events per current expiring credential with reminders only on renewal', () => {
+test('projects two all-day events per current expiring credential with labels, colors, and reminders only on renewal', () => {
   const events = buildGoogleCalendarDesiredEvents(
     [
       credential('az104', 'cert.azure-administrator-associate', '2027-03-15'),
@@ -110,6 +113,11 @@ test('projects two all-day events per current expiring credential with reminders
   const expiry = events.find((event) => event.kind === 'expiry');
   assert.ok(renewal);
   assert.ok(expiry);
+  assert.equal(renewal.summary, '【更新】AZ-104');
+  assert.equal(expiry.summary, '【期限】AZ-104');
+  assert.equal(renewal.colorId, GOOGLE_CALENDAR_RENEWAL_COLOR_ID);
+  assert.equal(expiry.colorId, GOOGLE_CALENDAR_EXPIRY_COLOR_ID);
+  assert.notEqual(renewal.colorId, expiry.colorId);
   assert.equal(renewal.start.date, '2026-09-15');
   assert.equal(renewal.end.date, '2026-09-16');
   assert.deepEqual(
