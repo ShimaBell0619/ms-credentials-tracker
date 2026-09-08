@@ -1,0 +1,312 @@
+name: Parser recovery bootstrap
+
+on:
+  push:
+    branches:
+      - feat/issue-10-transcript-pdf-import
+    paths:
+      - .github/workflows/parser-recovery-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-10-transcript-pdf-import
+      - name: Patch parser and diagnostics
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          parser = Path('src/domain/transcript-import.ts')
+          text = parser.read_text()
+
+          old = """function normalizeWhitespace(value: string): string {
+            return value
+              .replace(/\\u00a0/g, ' ')
+              .replace(/([A-Z0-9])[\\uFFFD\\uFFFE\\uFFFF]([A-Z0-9])/gi, '$1-$2')
+              .replace(/\\s+/g, ' ')
+              .trim();
+          }"""
+          new = """function normalizeWhitespace(value: string): string {
+            return value
+              .normalize('NFKC')
+              .replace(/\\u00a0/g, ' ')
+              .replace(/[\\u200B-\\u200D\\u2060\\uFEFF]/g, '')
+              .replace(/[‐‑‒–—−]/g, '-')
+              .replace(/([A-Z0-9])[\\uFFFD\\uFFFE\\uFFFF]([A-Z0-9])/gi, '$1-$2')
+              .replace(/\\s+/g, ' ')
+              .trim();
+          }"""
+          assert old in text
+          text = text.replace(old, new)
+
+          old = """        [definition.canonicalTitle, ...(definition.aliases ?? [])].some((candidate) =>
+                  normalized.includes(normalizeTitleForCompare(candidate)),
+                ),"""
+          new = """        [definition.canonicalTitle, ...(definition.aliases ?? [])].some((candidate) => {
+                  const normalizedCandidate = normalizeTitleForCompare(candidate);
+                  return (
+                    normalized.includes(normalizedCandidate) ||
+                    (normalized.length >= 16 && normalizedCandidate.startsWith(normalized))
+                  );
+                }),"""
+          assert old in text
+          text = text.replace(old, new)
+
+          active_re = re.compile(r"function getActiveCertificationSection\(compactText: string\): string \{.*?\n\}\n\nfunction parseCertificationTable", re.S)
+          active_new = r"""function findLastMatch(text: string, pattern: RegExp): RegExpMatchArray | null {
+            const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+            const globalPattern = new RegExp(pattern.source, flags);
+            let last: RegExpMatchArray | null = null;
+            for (const match of text.matchAll(globalPattern)) last = match;
+            return last;
+          }
+
+          function stripLeadingTableHeaders(section: string, patterns: RegExp[]): string {
+            const probe = section.slice(0, 600);
+            let end = 0;
+            for (const pattern of patterns) {
+              const match = pattern.exec(probe);
+              if (match?.index !== undefined) end = Math.max(end, match.index + match[0].length);
+            }
+            return section.slice(end).trim();
+          }
+
+          function getActiveCertificationSection(compactText: string): string {
+            const startMatch = findLastMatch(
+              compactText,
+              /\bActive certifications\b|アクティブな認定資格|有効な認定資格/i,
+            );
+            if (!startMatch || startMatch.index === undefined) return '';
+
+            const remainder = compactText.slice(startMatch.index + startMatch[0].length);
+            const endMatch = /\b(?:Passed exams|Applied Skills|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|合格した試験|合格済みの試験|応用スキル|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
+              remainder,
+            );
+            const section = endMatch ? remainder.slice(0, endMatch.index) : remainder;
+            return stripLeadingTableHeaders(section, [
+              /Certification title|認定資格(?:の)?タイトル/i,
+              /Certification number|認定資格番号|資格証明番号|資格情報番号/i,
+              /Earned on|取得日|取得日付/i,
+              /Expires on|有効期限|有効期限日/i,
+            ]);
+          }
+
+          function parseCertificationTable"""
+          text, count = active_re.subn(active_new, text)
+          assert count == 1, count
+
+          cert_re = re.compile(r"function parseCertificationTable\(compactText: string\): TranscriptCredentialCandidate\[] \{.*?\n\}\n\nfunction parseCertificationFallback", re.S)
+          cert_new = r"""function parseCertificationTable(compactText: string): TranscriptCredentialCandidate[] {
+            const section = getActiveCertificationSection(compactText);
+            if (!section) return [];
+
+            const numberPattern = new RegExp(EXTERNAL_NUMBER_SOURCE, 'gi');
+            const datePattern = new RegExp(`(?:${NO_DATE_SOURCE}|${DATE_SOURCE})`, 'gi');
+            const numbers = Array.from(section.matchAll(numberPattern));
+            const candidates: TranscriptCredentialCandidate[] = [];
+            let cursor = 0;
+
+            for (let index = 0; index < numbers.length; index += 1) {
+              const number = numbers[index];
+              if (number.index === undefined) continue;
+              const rawTitle = normalizeWhitespace(section.slice(cursor, number.index));
+              const microsoftIndex = Math.max(
+                rawTitle.lastIndexOf('Microsoft'),
+                rawTitle.lastIndexOf('マイクロソフト'),
+              );
+              const title = microsoftIndex >= 0 ? rawTitle.slice(microsoftIndex) : rawTitle;
+              const metadataStart = number.index + number[0].length;
+              const metadataEnd = numbers[index + 1]?.index ?? section.length;
+              const metadata = section.slice(metadataStart, metadataEnd);
+              const dates = Array.from(metadata.matchAll(datePattern)).slice(0, 2);
+              if (!title || dates.length === 0) continue;
+
+              candidates.push(
+                buildCredentialCandidate(
+                  'certification',
+                  title,
+                  number[0],
+                  normalizeTranscriptDate(dates[0]?.[0]),
+                  normalizeTranscriptDate(dates[1]?.[0]),
+                ),
+              );
+              const lastDate = dates[1] ?? dates[0];
+              cursor = metadataStart + (lastDate?.index ?? 0) + (lastDate?.[0].length ?? 0);
+            }
+
+            return candidates;
+          }
+
+          function parseCertificationFallback"""
+          text, count = cert_re.subn(cert_new, text)
+          assert count == 1, count
+
+          exams_re = re.compile(r"function getPassedExamSection\(compactText: string\): string \{.*?\n\}\n\nfunction parseExams\(compactText: string\): TranscriptExamCandidate\[] \{.*?\n\}\n\nfunction dedupeCredentials", re.S)
+          exams_new = r"""function getPassedExamSection(compactText: string): string {
+            const startMatch = findLastMatch(compactText, /\bPassed exams\b|合格した試験|合格済みの試験/i);
+            if (!startMatch || startMatch.index === undefined) return '';
+
+            const remainder = compactText.slice(startMatch.index + startMatch[0].length);
+            const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|応用スキル|有効な認定資格|アクティブな認定資格|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
+              remainder,
+            );
+            const section = endMatch ? remainder.slice(0, endMatch.index) : remainder;
+            return stripLeadingTableHeaders(section, [
+              /Exam title|試験(?:の)?タイトル/i,
+              /Exam number|試験番号/i,
+              /Passed date|合格日/i,
+            ]);
+          }
+
+          function parseExams(compactText: string): TranscriptExamCandidate[] {
+            const section = getPassedExamSection(compactText);
+            if (!section) return [];
+
+            const codePattern = /[A-Z]{1,5}-\d{2,4}/gi;
+            const datePattern = new RegExp(DATE_SOURCE, 'gi');
+            const codes = Array.from(section.matchAll(codePattern));
+            const exams: TranscriptExamCandidate[] = [];
+            let cursor = 0;
+
+            for (let index = 0; index < codes.length; index += 1) {
+              const code = codes[index];
+              if (code.index === undefined) continue;
+              const title = normalizeWhitespace(section.slice(cursor, code.index));
+              const afterCode = section.slice(code.index + code[0].length, codes[index + 1]?.index ?? section.length);
+              const date = datePattern.exec(afterCode);
+              if (!title || !date) continue;
+
+              exams.push({
+                title,
+                examNumber: code[0].toUpperCase(),
+                passedOn: normalizeTranscriptDate(date[0]),
+              });
+              cursor = code.index + code[0].length + (date.index ?? 0) + date[0].length;
+            }
+
+            return exams;
+          }
+
+          function dedupeCredentials"""
+          text, count = exams_re.subn(exams_new, text)
+          assert count == 1, count
+          parser.write_text(text)
+
+          component = Path('src/components/TranscriptImport.tsx')
+          text = component.read_text()
+          text = text.replace(
+            "  const [isLoading, setIsLoading] = useState(false);",
+            """  const [isLoading, setIsLoading] = useState(false);
+            const [diagnostics, setDiagnostics] = useState<{
+              textChars: number;
+              microsoftCount: number;
+              examCodeCount: number;
+              japaneseDateCount: number;
+              activeHeading: boolean;
+              examHeading: boolean;
+            } | null>(null);""",
+          )
+          text = text.replace(
+            "    setLoadError(null);\n  }",
+            "    setLoadError(null);\n    setDiagnostics(null);\n  }",
+            1,
+          )
+          text = text.replace(
+            "    setLoadError(null);\n    setResult(null);\n    setPageCount(null);",
+            "    setLoadError(null);\n    setResult(null);\n    setPageCount(null);\n    setDiagnostics(null);",
+          )
+          text = text.replace(
+            "      setPageCount(extracted.pageCount);\n      setResult(parseMicrosoftLearnTranscript(extracted.text));",
+            """      setPageCount(extracted.pageCount);
+              const parsed = parseMicrosoftLearnTranscript(extracted.text);
+              setResult(parsed);
+              const normalized = extracted.text.normalize('NFKC').replace(/[\\u200B-\\u200D\\u2060\\uFEFF]/g, '');
+              setDiagnostics({
+                textChars: normalized.length,
+                microsoftCount: (normalized.match(/Microsoft/gi) ?? []).length,
+                examCodeCount: (normalized.match(/[A-Z]{1,5}-\\d{2,4}/g) ?? []).length,
+                japaneseDateCount: (normalized.match(/\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日/g) ?? []).length,
+                activeHeading: /アクティブな認定資格|有効な認定資格|Active certifications/i.test(normalized),
+                examHeading: /合格した試験|合格済みの試験|Passed exams/i.test(normalized),
+              });""",
+          )
+          marker = """            {result.warnings.length > 0 ? (
+              <ul className=\"import-warnings\" aria-label=\"解析時の注意\">"""
+          insertion = """            {result.credentials.length === 0 && result.exams.length === 0 && diagnostics ? (
+              <details className=\"import-diagnostics\" open>
+                <summary>診断情報（個人データは表示しません）</summary>
+                <dl>
+                  <div><dt>抽出テキスト</dt><dd>{diagnostics.textChars}文字</dd></div>
+                  <div><dt>Microsoft</dt><dd>{diagnostics.microsoftCount}件</dd></div>
+                  <div><dt>試験コード</dt><dd>{diagnostics.examCodeCount}件</dd></div>
+                  <div><dt>日本語日付</dt><dd>{diagnostics.japaneseDateCount}件</dd></div>
+                  <div><dt>資格見出し</dt><dd>{diagnostics.activeHeading ? 'あり' : 'なし'}</dd></div>
+                  <div><dt>試験見出し</dt><dd>{diagnostics.examHeading ? 'あり' : 'なし'}</dd></div>
+                </dl>
+              </details>
+            ) : null}
+
+""" + marker
+          assert marker in text
+          text = text.replace(marker, insertion)
+          component.write_text(text)
+
+          css = Path('src/import.css')
+          text = css.read_text()
+          text += """
+
+          .import-diagnostics {
+            margin-top: 18px;
+            border-block: 1px solid var(--line);
+            padding: 12px 0;
+          }
+
+          .import-diagnostics summary {
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+          }
+
+          .import-diagnostics dl {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px 16px;
+            margin: 12px 0 0;
+          }
+
+          .import-diagnostics dl div {
+            display: grid;
+            gap: 3px;
+          }
+
+          .import-diagnostics dt {
+            color: var(--muted);
+            font-size: 10px;
+          }
+
+          .import-diagnostics dd {
+            margin: 0;
+            font: 600 11px/1.4 Consolas, \"SFMono-Regular\", monospace;
+          }
+
+          @media (max-width: 390px) {
+            .import-diagnostics dl {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+          """
+          css.write_text(text)
+      - name: Commit parser recovery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/domain/transcript-import.ts src/components/TranscriptImport.tsx src/import.css
+          git commit -m "fix: recover real Transcript PDF extraction"
+          git push origin HEAD:feat/issue-10-transcript-pdf-import
