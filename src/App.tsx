@@ -101,8 +101,9 @@ export default function App() {
           <div className="overview-copy">
             <p className="context-label">更新予定表</p>
             <h1 id="overview-title">
-              <span className="headline-phrase">次に必要な更新を、</span>
-              <span className="headline-phrase">日付から確認する。</span>
+              次に必要な更新を、
+              <br />
+              日付から確認する。
             </h1>
             <p>
               取得済み資格の状態と、更新・期限・受験予定を一つの時間軸で確認するモック画面です。
@@ -150,9 +151,7 @@ export default function App() {
                   className={`timeline-pin timeline-pin-${event.kind}`}
                   key={`${event.date}-${event.label}`}
                   style={{ '--pin-left': left } as CSSProperties}
-                >
-                  <span>{event.date}</span>
-                </div>
+                />
               ))}
             </div>
           </div>
