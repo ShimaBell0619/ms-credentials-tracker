@@ -1,0 +1,33 @@
+name: One-time tag v0.1.0
+
+on:
+  push:
+    branches:
+      - feat/issue-13-live-projections
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Create v0.1.0 tag on beta merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='6caacb3b0bb01227fc57b8214efdfdef739136a1'
+          if git ls-remote --exit-code --tags origin refs/tags/v0.1.0 >/dev/null 2>&1; then
+            echo 'v0.1.0 already exists; nothing to do.'
+            exit 0
+          fi
+          git fetch origin "$target" --depth=1
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a v0.1.0 "$target" -m 'v0.1.0 - Initial beta'
+          git push origin refs/tags/v0.1.0
