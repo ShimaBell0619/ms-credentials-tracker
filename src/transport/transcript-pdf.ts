@@ -57,7 +57,6 @@ export async function extractTranscriptPdfText(file: File): Promise<TranscriptPd
 
   const loadingTask = getDocument({
     data,
-    isEvalSupported: false,
     useSystemFonts: true,
     disableFontFace: true,
   });
