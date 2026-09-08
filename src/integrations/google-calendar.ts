@@ -4,6 +4,8 @@ import type { StoredCredential } from '../storage/local-credential-store.ts';
 export const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
 export const GOOGLE_CALENDAR_SUMMARY = 'Microsoft Credentials Tracker';
 export const RENEWAL_REMINDER_MINUTES = [40320, 10080, 0] as const;
+export const GOOGLE_CALENDAR_RENEWAL_COLOR_ID = '9';
+export const GOOGLE_CALENDAR_EXPIRY_COLOR_ID = '11';
 
 const GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 const MANAGED_MARKER_KEY = 'mctManaged';
@@ -25,6 +27,7 @@ export interface GoogleCalendarDesiredEvent {
   kind: GoogleCalendarEventKind;
   summary: string;
   description: string;
+  colorId: string;
   start: { date: string };
   end: { date: string };
   transparency: 'transparent';
@@ -41,6 +44,7 @@ export interface GoogleCalendarRemoteEvent {
   id: string;
   summary?: string;
   description?: string;
+  colorId?: string;
   start?: { date?: string };
   end?: { date?: string };
   transparency?: string;
@@ -138,8 +142,9 @@ function desiredEvent(
     key,
     credentialId,
     kind,
-    summary: `${displayName} ${renewal ? '更新可能' : '有効期限'}`,
+    summary: `${renewal ? '【更新】' : '【期限】'}${displayName}`,
     description: eventDescription(kind),
+    colorId: renewal ? GOOGLE_CALENDAR_RENEWAL_COLOR_ID : GOOGLE_CALENDAR_EXPIRY_COLOR_ID,
     start: { date },
     end: { date: addDaysIso(date, 1) },
     transparency: 'transparent',
@@ -163,6 +168,7 @@ export function fingerprintGoogleCalendarDesiredEvents(
       JSON.stringify([
         event.key,
         event.summary,
+        event.colorId,
         event.start.date,
         event.end.date,
         event.reminders.overrides.map((reminder) => reminder.minutes),
@@ -226,6 +232,7 @@ function remoteMatchesDesired(
   return (
     remote.summary === desired.summary &&
     remote.description === desired.description &&
+    remote.colorId === desired.colorId &&
     remote.start?.date === desired.start.date &&
     remote.end?.date === desired.end.date &&
     remote.transparency === desired.transparency &&
@@ -346,6 +353,7 @@ function eventResource(event: GoogleCalendarDesiredEvent) {
   return {
     summary: event.summary,
     description: event.description,
+    colorId: event.colorId,
     start: event.start,
     end: event.end,
     transparency: event.transparency,
