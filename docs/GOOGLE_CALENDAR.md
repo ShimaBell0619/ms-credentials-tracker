@@ -50,7 +50,14 @@ Full sync uses these markers rather than title/date matching. It creates missing
 
 If the locally stored dedicated calendar ID no longer exists for the authorized account, the app creates a new dedicated calendar. Clearing browser-local storage can therefore orphan the old dedicated calendar; it will not be guessed or deleted by title.
 
-## Reminder policy
+## Event presentation and reminder policy
+
+Managed events use explicit type prefixes so the meaning is visible even when Calendar colors are difficult to distinguish:
+
+- renewal opening: `【更新】<credential code/name>` with Google event color ID `9` (blue);
+- expiry: `【期限】<credential code/name>` with Google event color ID `11` (red).
+
+The colors are secondary cues only; the title prefix is the primary semantic marker. Existing managed events are patched to the desired title/color on the next explicit full sync.
 
 Renewal-opening events use popup reminders at:
 
