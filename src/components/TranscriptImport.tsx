@@ -1,5 +1,10 @@
 import { useRef, useState } from 'react';
 import {
+  analyzeTranscriptHtml,
+  describeTranscriptDiagnostic,
+  type TranscriptHtmlDiagnostics,
+} from '../domain/transcript-html-diagnostics.ts';
+import {
   parseMicrosoftLearnTranscript,
   type TranscriptParseResult,
 } from '../domain/transcript-import.ts';
@@ -19,10 +24,15 @@ function transcriptHtmlToText(html: string): string {
   return document.body?.textContent ?? '';
 }
 
+function yesNo(value: boolean): string {
+  return value ? 'あり' : 'なし';
+}
+
 export function TranscriptImport() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [shareUrl, setShareUrl] = useState('');
   const [result, setResult] = useState<TranscriptParseResult | null>(null);
+  const [diagnostics, setDiagnostics] = useState<TranscriptHtmlDiagnostics | null>(null);
   const [savedCount, setSavedCount] = useState(() => loadStoredCredentials().length);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,6 +54,7 @@ export function TranscriptImport() {
     setMessage(null);
     setLoadError(null);
     setResult(null);
+    setDiagnostics(null);
 
     const normalized = normalizeMicrosoftLearnTranscriptShareUrl(shareUrl);
     if (!normalized.ok) {
@@ -68,6 +79,9 @@ export function TranscriptImport() {
       const transcriptText = transcriptHtmlToText(response.html);
       const parsed = parseMicrosoftLearnTranscript(transcriptText);
       setResult(parsed);
+      if (parsed.credentials.length === 0 && parsed.exams.length === 0) {
+        setDiagnostics(analyzeTranscriptHtml(response.html));
+      }
     } catch {
       setLoadError('Transcript 取得サービスで予期しないエラーが発生しました。');
     } finally {
@@ -217,6 +231,27 @@ export function TranscriptImport() {
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
+            ) : null}
+
+            {diagnostics ? (
+              <>
+                <p className="load-error" role="status">
+                  {describeTranscriptDiagnostic(diagnostics)}
+                </p>
+                <details className="exam-results">
+                  <summary>診断情報（個人データは表示しません）</summary>
+                  <ul>
+                    <li><strong>HTML</strong><span>{diagnostics.htmlLength}文字</span></li>
+                    <li><strong>lang</strong><span>{diagnostics.documentLang ?? '不明'}</span></li>
+                    <li><strong>Certified</strong><span>{yesNo(diagnostics.containsMicrosoftCertified)}</span></li>
+                    <li><strong>Applied Skills</strong><span>{yesNo(diagnostics.containsAppliedSkills)}</span></li>
+                    <li><strong>Passed exams</strong><span>{yesNo(diagnostics.containsPassedExams)}</span></li>
+                    <li><strong>Earned on</strong><span>{yesNo(diagnostics.containsEarnedOn)}</span></li>
+                    <li><strong>日本語日付</strong><span>{yesNo(diagnostics.containsJapaneseDate)}</span></li>
+                    <li><strong>Hydration data</strong><span>{yesNo(diagnostics.containsHydrationData)}</span></li>
+                  </ul>
+                </details>
+              </>
             ) : null}
 
             <div className="confirm-area">
