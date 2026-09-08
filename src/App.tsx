@@ -106,7 +106,7 @@ export default function App() {
             </p>
           </div>
 
-          <div className="next-action" role="group" aria-label="次に対応が必要な資格">
+          <section className="next-action" aria-label="次に対応が必要な資格">
             <div className="deadline-date">
               <span>次の期限</span>
               <strong>10.19</strong>
@@ -118,11 +118,12 @@ export default function App() {
               <StatusText status="更新可能" />
               <p>有効期限までに更新アセスメントを完了します。</p>
             </div>
-            <div className="days-left" role="group" aria-label="期限まで41日">
+            <div className="days-left">
+              <span className="sr-only">有効期限まで</span>
               <strong>41</strong>
               <span>日</span>
             </div>
-          </div>
+          </section>
         </section>
 
         <section id="schedule" className="timeline-section" aria-labelledby="timeline-title">
