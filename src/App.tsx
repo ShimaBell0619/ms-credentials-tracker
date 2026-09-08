@@ -100,7 +100,10 @@ export default function App() {
         <section className="overview" aria-labelledby="overview-title">
           <div className="overview-copy">
             <p className="context-label">更新予定表</p>
-            <h1 id="overview-title">次に必要な更新を、日付から確認する。</h1>
+            <h1 id="overview-title">
+              <span className="headline-phrase">次に必要な更新を、</span>
+              <span className="headline-phrase">日付から確認する。</span>
+            </h1>
             <p>
               取得済み資格の状態と、更新・期限・受験予定を一つの時間軸で確認するモック画面です。
             </p>
