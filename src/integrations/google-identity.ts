@@ -33,9 +33,12 @@ declare global {
 }
 
 export class GoogleAuthorizationError extends Error {
-  constructor(readonly kind: 'cancelled' | 'oauth' | 'unavailable') {
+  readonly kind: 'cancelled' | 'oauth' | 'unavailable';
+
+  constructor(kind: 'cancelled' | 'oauth' | 'unavailable') {
     super(kind === 'cancelled' ? 'Google authorization was cancelled.' : 'Google authorization failed.');
     this.name = 'GoogleAuthorizationError';
+    this.kind = kind;
   }
 }
 
