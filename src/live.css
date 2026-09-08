@@ -75,3 +75,13 @@
     border-top: 1px solid var(--line);
   }
 }
+
+@media (max-width: 360px) {
+  .next-action-empty {
+    padding-inline: 24px;
+  }
+
+  .next-action-empty h2 {
+    font-size: 18px;
+  }
+}
