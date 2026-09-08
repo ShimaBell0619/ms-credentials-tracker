@@ -49,8 +49,10 @@ export function TranscriptImport() {
         資格を取り込む
       </button>
       {savedCount > 0 ? (
-        <span className="saved-count" aria-label={`保存済み ${savedCount}件`}>
+        <span className="saved-count">
+          <span className="sr-only">保存済み </span>
           {savedCount}
+          <span className="sr-only">件</span>
         </span>
       ) : null}
 

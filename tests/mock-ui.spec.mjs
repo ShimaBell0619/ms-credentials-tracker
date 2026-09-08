@@ -73,8 +73,8 @@ test('transcript paste import requires confirmation and persists matched credent
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
   await expect(dialog.getByText('1件をブラウザに保存しました。')).toBeVisible();
-  await expect(page.locator('[aria-label="保存済み 1件"]')).toBeVisible();
+  await expect(page.locator('.saved-count')).toContainText('1');
 
   await page.reload();
-  await expect(page.locator('[aria-label="保存済み 1件"]')).toBeVisible();
+  await expect(page.locator('.saved-count')).toContainText('1');
 });
