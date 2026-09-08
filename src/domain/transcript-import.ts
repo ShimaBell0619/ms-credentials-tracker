@@ -63,22 +63,22 @@ const EXPIRES_LABEL_SOURCE = '(?:(?:Expires on|有効期限|有効期限日)\\s*
 
 function normalizeWhitespace(value: string): string {
   return value
+    .normalize('NFKC')
     .replace(/\u00a0/g, ' ')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    .replace(/[‐‑‒–—−]/g, '-')
     .replace(/([A-Z0-9])[\uFFFD\uFFFE\uFFFF]([A-Z0-9])/gi, '$1-$2')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function normalizeTitleForCompare(value: string): string {
-  return normalizeWhitespace(value)
-    .normalize('NFKC')
-    .replace(/\s+/g, '')
-    .toLocaleLowerCase('en-US');
+  return normalizeWhitespace(value).replace(/\s+/g, '').toLocaleLowerCase('en-US');
 }
 
 function normalizeExternalNumber(value: string | null | undefined): string | null {
   if (!value) return null;
-  return normalizeWhitespace(value).replace(/\s*-\s*/g, '-');
+  return normalizeWhitespace(value).replace(/\s*-\s*/g, '-').replace(/\s+/g, '');
 }
 
 function canonicalTitleInside(
@@ -90,9 +90,13 @@ function canonicalTitleInside(
     credentialDefinitions.find(
       (definition) =>
         definition.kind === kind &&
-        [definition.canonicalTitle, ...(definition.aliases ?? [])].some((candidate) =>
-          normalized.includes(normalizeTitleForCompare(candidate)),
-        ),
+        [definition.canonicalTitle, ...(definition.aliases ?? [])].some((candidate) => {
+          const normalizedCandidate = normalizeTitleForCompare(candidate);
+          return (
+            normalized.includes(normalizedCandidate) ||
+            (normalized.length >= 16 && normalizedCandidate.startsWith(normalized))
+          );
+        }),
     )?.canonicalTitle ?? null
   );
 }
@@ -108,14 +112,14 @@ export function normalizeTranscriptDate(value: string | null | undefined): strin
     return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}-${String(Number(match[3])).padStart(2, '0')}`;
   }
 
-  match = normalized.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+  match = normalized.match(/^([A-Za-z]+)\s*(\d{1,2}),?\s*(\d{4})$/);
   if (match) {
     const month = MONTHS[match[1].toLowerCase()];
     if (!month) return null;
     return `${match[3]}-${String(month).padStart(2, '0')}-${String(Number(match[2])).padStart(2, '0')}`;
   }
 
-  match = normalized.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  match = normalized.match(/^(\d{1,2})\s*([A-Za-z]+)\s*(\d{4})$/);
   if (match) {
     const month = MONTHS[match[2].toLowerCase()];
     if (!month) return null;
@@ -147,43 +151,83 @@ function buildCredentialCandidate(
   };
 }
 
+function findLastMatch(text: string, pattern: RegExp): RegExpMatchArray | null {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  const globalPattern = new RegExp(pattern.source, flags);
+  let last: RegExpMatchArray | null = null;
+  for (const match of text.matchAll(globalPattern)) last = match;
+  return last;
+}
+
+function stripLeadingTableHeaders(section: string, patterns: RegExp[]): string {
+  const probe = section.slice(0, 600);
+  let end = 0;
+  for (const pattern of patterns) {
+    const match = pattern.exec(probe);
+    if (match?.index !== undefined) end = Math.max(end, match.index + match[0].length);
+  }
+  return section.slice(end).trim();
+}
+
 function getActiveCertificationSection(compactText: string): string {
-  const startPattern = new RegExp(
-    `(?:\\bActive certifications\\b|アクティブな認定資格|有効な認定資格)\\s+` +
-      `(?:Certification title|認定資格(?:の)?タイトル)\\s+` +
-      `(?:Certification number|認定資格番号|資格証明番号|資格情報番号)\\s+` +
-      `(?:Earned on|取得日|取得日付)\\s+` +
-      `(?:Expires on|有効期限|有効期限日)`,
-    'i',
+  const startMatch = findLastMatch(
+    compactText,
+    /\bActive certifications\b|アクティブな認定資格|有効な認定資格/i,
   );
-  const startMatch = startPattern.exec(compactText);
-  if (!startMatch) return '';
+  if (!startMatch || startMatch.index === undefined) return '';
 
   const remainder = compactText.slice(startMatch.index + startMatch[0].length);
   const endMatch = /\b(?:Passed exams|Applied Skills|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|合格した試験|合格済みの試験|応用スキル|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
     remainder,
   );
-  return endMatch ? remainder.slice(0, endMatch.index) : remainder;
+  const section = endMatch ? remainder.slice(0, endMatch.index) : remainder;
+  return stripLeadingTableHeaders(section, [
+    /Certification title|認定資格(?:の)?タイトル/i,
+    /Certification number|認定資格番号|資格証明番号|資格情報番号/i,
+    /Earned on|取得日|取得日付/i,
+    /Expires on|有効期限|有効期限日/i,
+  ]);
 }
 
 function parseCertificationTable(compactText: string): TranscriptCredentialCandidate[] {
   const section = getActiveCertificationSection(compactText);
   if (!section) return [];
 
-  const pattern = new RegExp(
-    `(.+?)\\s+(${EXTERNAL_NUMBER_SOURCE})\\s+(${DATE_SOURCE})\\s+(${NO_DATE_SOURCE}|${DATE_SOURCE})`,
-    'gi',
-  );
+  const numberPattern = new RegExp(EXTERNAL_NUMBER_SOURCE, 'gi');
+  const datePattern = new RegExp(`(?:${NO_DATE_SOURCE}|${DATE_SOURCE})`, 'gi');
+  const numbers = Array.from(section.matchAll(numberPattern));
+  const candidates: TranscriptCredentialCandidate[] = [];
+  let cursor = 0;
 
-  return Array.from(section.matchAll(pattern), (match) =>
-    buildCredentialCandidate(
-      'certification',
-      match[1],
-      match[2],
-      normalizeTranscriptDate(match[3]),
-      normalizeTranscriptDate(match[4]),
-    ),
-  );
+  for (let index = 0; index < numbers.length; index += 1) {
+    const number = numbers[index];
+    if (number.index === undefined) continue;
+    const rawTitle = normalizeWhitespace(section.slice(cursor, number.index));
+    const microsoftIndex = Math.max(
+      rawTitle.lastIndexOf('Microsoft'),
+      rawTitle.lastIndexOf('マイクロソフト'),
+    );
+    const title = microsoftIndex >= 0 ? rawTitle.slice(microsoftIndex) : rawTitle;
+    const metadataStart = number.index + number[0].length;
+    const metadataEnd = numbers[index + 1]?.index ?? section.length;
+    const metadata = section.slice(metadataStart, metadataEnd);
+    const dates = Array.from(metadata.matchAll(datePattern)).slice(0, 2);
+    if (!title || dates.length === 0) continue;
+
+    candidates.push(
+      buildCredentialCandidate(
+        'certification',
+        title,
+        number[0],
+        normalizeTranscriptDate(dates[0]?.[0]),
+        normalizeTranscriptDate(dates[1]?.[0]),
+      ),
+    );
+    const lastDate = dates[1] ?? dates[0];
+    cursor = metadataStart + (lastDate?.index ?? 0) + (lastDate?.[0].length ?? 0);
+  }
+
+  return candidates;
 }
 
 function parseCertificationFallback(compactText: string): TranscriptCredentialCandidate[] {
@@ -228,33 +272,48 @@ function parseAppliedSkills(compactText: string): TranscriptCredentialCandidate[
 }
 
 function getPassedExamSection(compactText: string): string {
-  const startPattern = new RegExp(
-    `(?:\\bPassed exams\\b|合格した試験|合格済みの試験)\\s+` +
-      `(?:Exam title|試験(?:の)?タイトル)\\s+` +
-      `(?:Exam number|試験番号)\\s+` +
-      `(?:Passed date|合格日)`,
-    'i',
-  );
-  const startMatch = startPattern.exec(compactText);
-  if (!startMatch) return '';
+  const startMatch = findLastMatch(compactText, /\bPassed exams\b|合格した試験|合格済みの試験/i);
+  if (!startMatch || startMatch.index === undefined) return '';
 
   const remainder = compactText.slice(startMatch.index + startMatch[0].length);
   const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|応用スキル|有効な認定資格|アクティブな認定資格|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
     remainder,
   );
-  return endMatch ? remainder.slice(0, endMatch.index) : remainder;
+  const section = endMatch ? remainder.slice(0, endMatch.index) : remainder;
+  return stripLeadingTableHeaders(section, [
+    /Exam title|試験(?:の)?タイトル/i,
+    /Exam number|試験番号/i,
+    /Passed date|合格日/i,
+  ]);
 }
 
 function parseExams(compactText: string): TranscriptExamCandidate[] {
   const section = getPassedExamSection(compactText);
   if (!section) return [];
 
-  const pattern = new RegExp(`(.+?)\\s+([A-Z]{1,5}-\\d{2,4})\\s+(${DATE_SOURCE})`, 'gi');
-  return Array.from(section.matchAll(pattern), (match) => ({
-    title: normalizeWhitespace(match[1]),
-    examNumber: match[2].toUpperCase(),
-    passedOn: normalizeTranscriptDate(match[3]),
-  }));
+  const codePattern = /[A-Z]{1,5}-\d{2,4}/gi;
+  const datePattern = new RegExp(DATE_SOURCE, 'i');
+  const codes = Array.from(section.matchAll(codePattern));
+  const exams: TranscriptExamCandidate[] = [];
+  let cursor = 0;
+
+  for (let index = 0; index < codes.length; index += 1) {
+    const code = codes[index];
+    if (code.index === undefined) continue;
+    const title = normalizeWhitespace(section.slice(cursor, code.index));
+    const afterCode = section.slice(code.index + code[0].length, codes[index + 1]?.index ?? section.length);
+    const date = datePattern.exec(afterCode);
+    if (!title || !date) continue;
+
+    exams.push({
+      title,
+      examNumber: code[0].toUpperCase(),
+      passedOn: normalizeTranscriptDate(date[0]),
+    });
+    cursor = code.index + code[0].length + (date.index ?? 0) + date[0].length;
+  }
+
+  return exams;
 }
 
 function dedupeCredentials(candidates: TranscriptCredentialCandidate[]): TranscriptCredentialCandidate[] {

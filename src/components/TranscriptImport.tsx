@@ -14,6 +14,34 @@ import {
 } from '../transport/transcript-pdf.ts';
 import '../import.css';
 
+interface TranscriptDiagnostics {
+  textChars: number;
+  microsoftCount: number;
+  examCodeCount: number;
+  japaneseDateCount: number;
+  activeHeading: boolean;
+  examHeading: boolean;
+}
+
+function buildDiagnostics(text: string): TranscriptDiagnostics {
+  const normalized = text
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    .replace(/[‐‑‒–—−]/g, '-');
+  return {
+    textChars: normalized.length,
+    microsoftCount: (normalized.match(/Microsoft/gi) ?? []).length,
+    examCodeCount: (normalized.match(/[A-Z]{1,5}-\d{2,4}/g) ?? []).length,
+    japaneseDateCount: (
+      normalized.match(/\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日/g) ?? []
+    ).length,
+    activeHeading: /アクティブな認定資格|有効な認定資格|Active certifications/i.test(
+      normalized,
+    ),
+    examHeading: /合格した試験|合格済みの試験|Passed exams/i.test(normalized),
+  };
+}
+
 function pdfErrorMessage(error: TranscriptPdfReadError): string {
   switch (error) {
     case 'notPdf':
@@ -42,6 +70,7 @@ export function TranscriptImport() {
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<TranscriptDiagnostics | null>(null);
 
   const matchedCount =
     result?.credentials.filter(
@@ -62,6 +91,7 @@ export function TranscriptImport() {
     setPageCount(null);
     setMessage(null);
     setLoadError(null);
+    setDiagnostics(null);
   }
 
   async function analyzePdf() {
@@ -70,11 +100,13 @@ export function TranscriptImport() {
     setLoadError(null);
     setResult(null);
     setPageCount(null);
+    setDiagnostics(null);
     setIsLoading(true);
 
     try {
       const extracted = await extractTranscriptPdfText(file);
       setPageCount(extracted.pageCount);
+      setDiagnostics(buildDiagnostics(extracted.text));
       setResult(parseMicrosoftLearnTranscript(extracted.text));
     } catch (error) {
       const code =
@@ -226,6 +258,38 @@ export function TranscriptImport() {
                     </li>
                   ))}
                 </ul>
+              </details>
+            ) : null}
+
+            {result.credentials.length === 0 && result.exams.length === 0 && diagnostics ? (
+              <details className="import-diagnostics" open>
+                <summary>診断情報（個人データは表示しません）</summary>
+                <dl>
+                  <div>
+                    <dt>抽出テキスト</dt>
+                    <dd>{diagnostics.textChars}文字</dd>
+                  </div>
+                  <div>
+                    <dt>Microsoft</dt>
+                    <dd>{diagnostics.microsoftCount}件</dd>
+                  </div>
+                  <div>
+                    <dt>試験コード</dt>
+                    <dd>{diagnostics.examCodeCount}件</dd>
+                  </div>
+                  <div>
+                    <dt>日本語日付</dt>
+                    <dd>{diagnostics.japaneseDateCount}件</dd>
+                  </div>
+                  <div>
+                    <dt>資格見出し</dt>
+                    <dd>{diagnostics.activeHeading ? 'あり' : 'なし'}</dd>
+                  </div>
+                  <div>
+                    <dt>試験見出し</dt>
+                    <dd>{diagnostics.examHeading ? 'あり' : 'なし'}</dd>
+                  </div>
+                </dl>
               </details>
             ) : null}
 
