@@ -18,7 +18,7 @@ jobs:
         with:
           ref: feat/issue-10-transcript-pdf-import
       - name: Patch parser and diagnostics
-        shell: python
+        shell: python {0}
         run: |
           from pathlib import Path
           import re
