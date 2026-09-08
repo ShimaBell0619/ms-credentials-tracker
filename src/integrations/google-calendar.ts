@@ -75,24 +75,33 @@ export interface GoogleCalendarSyncResult extends GoogleCalendarSyncCounts {
 }
 
 export class GoogleCalendarApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
     super(message);
     this.name = 'GoogleCalendarApiError';
+    this.status = status;
   }
 }
 
 export class GoogleCalendarSyncError extends Error {
+  readonly stage: 'calendar' | 'events';
+  readonly calendarId: string | null;
+  readonly partial: GoogleCalendarSyncCounts;
+  readonly cause: unknown;
+
   constructor(
-    readonly stage: 'calendar' | 'events',
-    readonly calendarId: string | null,
-    readonly partial: GoogleCalendarSyncCounts,
-    readonly cause: unknown,
+    stage: 'calendar' | 'events',
+    calendarId: string | null,
+    partial: GoogleCalendarSyncCounts,
+    cause: unknown,
   ) {
     super(stage === 'calendar' ? 'Google Calendar setup failed.' : 'Google Calendar sync failed.');
     this.name = 'GoogleCalendarSyncError';
+    this.stage = stage;
+    this.calendarId = calendarId;
+    this.partial = partial;
+    this.cause = cause;
   }
 }
 
@@ -381,7 +390,11 @@ async function googleRequest<T>(
 }
 
 export class GoogleCalendarRestApi implements GoogleCalendarApi {
-  constructor(private readonly accessToken: string) {}
+  private readonly accessToken: string;
+
+  constructor(accessToken: string) {
+    this.accessToken = accessToken;
+  }
 
   getCalendar(calendarId: string) {
     return googleRequest<{ id: string; summary?: string }>(
