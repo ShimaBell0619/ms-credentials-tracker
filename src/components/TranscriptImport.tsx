@@ -115,7 +115,11 @@ export function TranscriptImport() {
   }
 
   useEffect(() => {
-    const open = () => openDialog();
+    const open = () => {
+      setMessage(null);
+      setLoadError(null);
+      dialogRef.current?.showModal();
+    };
     window.addEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
     return () => window.removeEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
   }, []);
