@@ -36,6 +36,19 @@ npm run build
 npm run test:e2e
 ```
 
+## Deployment
+
+Production hosting uses Vercel with the GitHub repository as the deployment source.
+
+- pushes to `main` are the production-deployment path
+- Pull Requests use Vercel Preview Deployments for browser and mobile UI review
+- GitHub Actions remains responsible for repository quality checks; Vercel deployment is handled by the standard Git integration rather than a custom deployment workflow
+- SPA deep links are routed back to `index.html` through `vercel.json`, so direct navigation and reloads remain valid
+
+The repository does not hard-code a production URL. Use the URL assigned to the Vercel project after the project is connected.
+
+`VITE_GOOGLE_CLIENT_ID` is required only for the Google Calendar sync integration. Configure it in Vercel for the environments where that integration should be enabled.
+
 ## Transcript import boundary
 
 The MVP import path is:
