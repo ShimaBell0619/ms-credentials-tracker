@@ -89,25 +89,26 @@ This is a product-scope decision for the MVP, not a permanent architecture endor
 
 ## Microsoft Learn Transcript import
 
-The primary assisted-input path is the official Microsoft Learn Transcript share URL.
+The primary assisted-input path is a Microsoft Learn Transcript PDF saved by the user through the browser's print/save flow.
 
 Pipeline:
 
-1. user pastes a Transcript share URL
-2. application validates that it is an HTTPS `learn.microsoft.com` Transcript share URL
-3. browser attempts to retrieve the public shared Transcript without credentials
-4. returned HTML is reduced to text and passed to the Transcript parser
-5. parser extracts supported external records and normalizes them into `ImportCandidate` values
-6. candidates are matched against the local `CredentialDefinition` catalog
-7. unresolved candidates remain unresolved; the application must not invent a credential identity
-8. user explicitly reviews and confirms candidates
-9. only confirmed, matched records become application data
+1. user opens the Microsoft Learn Transcript and saves it as PDF
+2. user selects the PDF in the application
+3. PDF.js extracts the text locally in the browser; the PDF is not uploaded to an application server
+4. parser extracts supported external records and normalizes them into `ImportCandidate` values
+5. candidates are matched against the local `CredentialDefinition` catalog
+6. unresolved candidates remain unresolved; the application must not invent a credential identity
+7. user explicitly reviews and confirms candidates
+8. only confirmed, matched records become application data
 
-The share URL itself is transport input and is not persisted as application credential data.
+The selected PDF file itself is transport/input material and is not persisted. Only confirmed normalized credential facts are written to the versioned browser-local store.
 
-The shared Transcript page and copied-text layout are not treated as Microsoft API contracts. Parsing must therefore remain tolerant and conservative. The direct browser fetch is explicitly a feasibility step: if Microsoft Learn blocks cross-origin retrieval, a trusted stateless fetch endpoint may replace only the transport step without changing candidate normalization, confirmation, or browser-local storage. Third-party CORS proxy services are not an acceptable production path.
+The Transcript PDF layout is not treated as a Microsoft API contract. Parsing must remain tolerant and conservative across supported date/label layouts. Image-only or scanned PDFs are not OCR'd in this MVP.
 
-PDF import and manual-entry UX are follow-up input paths. A future Microsoft API or synchronization path must enter through the same reconciliation boundary rather than bypassing user-owned application state.
+The shared-URL route was empirically rejected for the MVP: browser fetch is blocked by CORS, while a trusted server-side fetch retrieved only the initial page shell without the credential facts visible after normal browser rendering. The application therefore does not depend on shared-page scraping, browser automation, or undocumented internal Microsoft Learn endpoints.
+
+Manual-entry UX and any future Microsoft synchronization path are separate follow-ups. A future API/synchronization path must enter through the same reconciliation boundary rather than bypassing user-owned application state.
 
 ## Current UI boundary
 
@@ -117,7 +118,7 @@ During the first import slice, browser-local imported records are intentionally 
 
 ## Testing contract
 
-Independent domain logic requires unit tests. The previous UI-only unit-test opt-out is no longer valid once transcript parsing and normalization are introduced.
+Independent domain logic requires unit tests. The previous UI-only unit-test opt-out is no longer valid once Transcript parsing and normalization are introduced.
 
 Required gates are:
 
