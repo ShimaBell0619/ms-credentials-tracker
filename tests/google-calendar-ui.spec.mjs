@@ -55,3 +55,28 @@ for (const viewport of viewports) {
     expect(widths.content).toBeLessThanOrEqual(widths.viewport);
   });
 }
+
+test('marks cleanup as unsynchronized when the last desired Calendar events disappear', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-08T12:00:00Z'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ms-credentials-tracker:credentials:v2',
+      JSON.stringify({ version: 2, credentials: [], history: [] }),
+    );
+    window.localStorage.setItem(
+      'ms-credentials-tracker:google-calendar:v1',
+      JSON.stringify({
+        version: 1,
+        calendarId: 'calendar-created-by-app',
+        lastSyncedAt: '2026-09-01T00:00:00.000Z',
+        lastResult: { created: 2, updated: 0, deleted: 0, unchanged: 0 },
+        lastDesiredFingerprint: 'previous-non-empty-desired-state',
+      }),
+    );
+  });
+  await page.goto('/');
+
+  await expect(page.getByRole('button', { name: 'カレンダーを更新' })).toBeVisible();
+  await expect(page.getByText('未同期', { exact: true })).toBeVisible();
+});
