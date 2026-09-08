@@ -2,7 +2,10 @@ import type { TranscriptCredentialCandidate } from '../domain/transcript-import.
 
 export const CREDENTIAL_STORAGE_KEY = 'ms-credentials-tracker:credentials:v1';
 
-export type CredentialImportSource = 'learnTranscriptPaste' | 'learnTranscriptShareUrl';
+export type CredentialImportSource =
+  | 'learnTranscriptPaste'
+  | 'learnTranscriptShareUrl'
+  | 'learnTranscriptPdf';
 
 export interface StoredCredential {
   id: string;
@@ -27,7 +30,11 @@ export interface SaveCredentialResult {
 }
 
 function isSupportedSource(value: unknown): value is CredentialImportSource {
-  return value === 'learnTranscriptPaste' || value === 'learnTranscriptShareUrl';
+  return (
+    value === 'learnTranscriptPaste' ||
+    value === 'learnTranscriptShareUrl' ||
+    value === 'learnTranscriptPdf'
+  );
 }
 
 export function loadStoredCredentials(storage: Storage = window.localStorage): StoredCredential[] {
@@ -58,7 +65,7 @@ function candidateIdentity(candidate: TranscriptCredentialCandidate): string {
 
 export function saveConfirmedCredentialCandidates(
   candidates: TranscriptCredentialCandidate[],
-  source: CredentialImportSource = 'learnTranscriptShareUrl',
+  source: CredentialImportSource = 'learnTranscriptPdf',
   storage: Storage = window.localStorage,
   now: Date = new Date(),
 ): SaveCredentialResult {
