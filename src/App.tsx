@@ -1,76 +1,187 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { TranscriptImport } from './components/TranscriptImport';
-import { credentials, scheduleEvents, type CredentialStatus } from './mock-data';
+import {
+  addDaysIso,
+  buildCredentialDashboard,
+  differenceInCalendarDays,
+  localDateToIso,
+  type CredentialDerivedStatus,
+  type CredentialProjection,
+  type CredentialScheduleEvent,
+} from './domain/credential-projection';
+import {
+  CREDENTIAL_STORAGE_CHANGED_EVENT,
+  loadStoredCredentials,
+} from './storage/local-credential-store';
 
-const statusClass: Record<CredentialStatus, string> = {
-  更新可能: 'status status-renewal',
-  有効: 'status status-active',
-  期限なし: 'status status-permanent',
+const statusText: Record<CredentialDerivedStatus, string> = {
+  active: '有効',
+  renewalAvailable: '更新可能',
+  expired: '期限切れ',
+  nonExpiring: '期限なし',
 };
 
-const timelinePositions = [
-  { left: '15%', event: scheduleEvents[0] },
-  { left: '46%', event: scheduleEvents[1] },
-  { left: '50%', event: scheduleEvents[2] },
-  { left: '77%', event: scheduleEvents[3] },
-];
+const statusClass: Record<CredentialDerivedStatus, string> = {
+  active: 'status status-active',
+  renewalAvailable: 'status status-renewal',
+  expired: 'status status-expired',
+  nonExpiring: 'status status-permanent',
+};
 
-const calendarDays = [
-  null,
-  1,
-  2,
-  3,
-  4,
-  5,
-  6,
-  7,
-  8,
-  9,
-  10,
-  11,
-  12,
-  13,
-  14,
-  15,
-  16,
-  17,
-  18,
-  19,
-  20,
-  21,
-  22,
-  23,
-  24,
-  25,
-  26,
-  27,
-  28,
-  29,
-  30,
-  null,
-  null,
-  null,
-  null,
-];
+function parseIsoDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
 
-const calendarWeeks = Array.from({ length: 5 }, (_, weekIndex) => ({
-  id: `week-${weekIndex + 1}`,
-  days: calendarDays.slice(weekIndex * 7, weekIndex * 7 + 7).map((day, dayIndex) => ({
-    id: day ? `day-${day}` : `empty-${weekIndex + 1}-${dayIndex + 1}`,
-    day,
-  })),
-}));
+function formatFullDate(value: string | null): string {
+  return value ? value.replaceAll('-', '.') : '—';
+}
 
-function StatusText({ status }: { status: CredentialStatus }) {
+function formatMonthDay(value: string): string {
+  return value.slice(5).replace('-', '.');
+}
+
+function formatDeadlineMeta(value: string): string {
+  const date = parseIsoDate(value);
+  const weekday = new Intl.DateTimeFormat('ja-JP', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  }).format(date);
+  return `${date.getUTCFullYear()} / ${weekday}`;
+}
+
+function formatReferenceDate(value: string): string {
+  return value.replaceAll('-', '.');
+}
+
+function renewalNote(credential: CredentialProjection): string {
+  switch (credential.status) {
+    case 'nonExpiring':
+      return '更新不要';
+    case 'expired':
+      return '有効期限を過ぎています';
+    case 'renewalAvailable':
+      return '更新アセスメントを受験できます';
+    case 'active':
+      return credential.renewalOpensOn
+        ? `${formatFullDate(credential.renewalOpensOn)} から更新可能`
+        : '有効期限を確認してください';
+  }
+}
+
+function timelinePosition(referenceDate: string, date: string): string {
+  const offset = Math.max(0, Math.min(89, differenceInCalendarDays(date, referenceDate)));
+  return `${(offset / 89) * 100}%`;
+}
+
+function monthSequence(start: string, end: string): Array<{ id: string; label: string }> {
+  const startDate = parseIsoDate(start);
+  const endDate = parseIsoDate(end);
+  const months: Array<{ id: string; label: string }> = [];
+  let year = startDate.getUTCFullYear();
+  let month = startDate.getUTCMonth();
+  const endIndex = endDate.getUTCFullYear() * 12 + endDate.getUTCMonth();
+
+  while (year * 12 + month <= endIndex) {
+    months.push({ id: `${year}-${month + 1}`, label: `${month + 1}月` });
+    month += 1;
+    if (month === 12) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return months;
+}
+
+function timelineContext(start: string, end: string): string {
+  const startDate = parseIsoDate(start);
+  const endDate = parseIsoDate(end);
+  const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
+  const startMonth = formatter.format(startDate);
+  const endMonth = formatter.format(endDate);
+  const startYear = startDate.getUTCFullYear();
+  const endYear = endDate.getUTCFullYear();
+  return startYear === endYear
+    ? `${startMonth} — ${endMonth} ${endYear}`
+    : `${startMonth} ${startYear} — ${endMonth} ${endYear}`;
+}
+
+interface CalendarCell {
+  id: string;
+  day: number | null;
+  events: CredentialScheduleEvent[];
+}
+
+function buildCalendar(referenceDate: string, events: CredentialScheduleEvent[]) {
+  const reference = parseIsoDate(referenceDate);
+  const year = reference.getUTCFullYear();
+  const monthIndex = reference.getUTCMonth();
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const firstDay = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
+  const mondayOffset = (firstDay + 6) % 7;
+  const cells: CalendarCell[] = [];
+
+  for (let index = 0; index < mondayOffset; index += 1) {
+    cells.push({ id: `leading-${index}`, day: null, events: [] });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const iso = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    cells.push({
+      id: iso,
+      day,
+      events: events.filter((event) => event.date === iso),
+    });
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push({ id: `trailing-${cells.length}`, day: null, events: [] });
+  }
+
+  const weeks = Array.from({ length: cells.length / 7 }, (_, index) => ({
+    id: `week-${index}`,
+    days: cells.slice(index * 7, index * 7 + 7),
+  }));
+
+  return {
+    year,
+    month: monthIndex + 1,
+    monthName: new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' }).format(reference),
+    referenceDay: reference.getUTCDate(),
+    weeks,
+  };
+}
+
+function StatusText({ status }: { status: CredentialDerivedStatus }) {
   return (
     <span className={statusClass[status]}>
       <span className="status-dot" aria-hidden="true" />
-      {status}
+      {statusText[status]}
     </span>
   );
 }
 
 export default function App() {
+  const [storedCredentials, setStoredCredentials] = useState(() => loadStoredCredentials());
+  const referenceDate = localDateToIso(new Date());
+  const timelineEnd = addDaysIso(referenceDate, 89);
+  const dashboard = useMemo(
+    () => buildCredentialDashboard(storedCredentials, referenceDate),
+    [storedCredentials, referenceDate],
+  );
+  const months = monthSequence(referenceDate, timelineEnd);
+  const calendar = buildCalendar(referenceDate, dashboard.scheduleEvents);
+
+  useEffect(() => {
+    const refresh = () => setStoredCredentials(loadStoredCredentials());
+    window.addEventListener(CREDENTIAL_STORAGE_CHANGED_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(CREDENTIAL_STORAGE_CHANGED_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -93,7 +204,7 @@ export default function App() {
 
         <div className="header-meta">
           <TranscriptImport />
-          <span className="mock-label">Mock data</span>
+          <span className="mock-label">Local data</span>
         </div>
       </header>
 
@@ -112,127 +223,149 @@ export default function App() {
               資格の更新予定
             </h1>
             <p className="date-cell" style={{ marginTop: '10px', fontSize: '11px', lineHeight: 1.4 }}>
-              サンプル基準日 <time dateTime="2026-09-08">2026.09.08</time>
+              基準日 <time dateTime={referenceDate}>{formatReferenceDate(referenceDate)}</time>
             </p>
           </div>
 
-          <section className="next-action" aria-label="次に対応が必要な資格">
-            <div className="deadline-date">
-              <span>次の期限</span>
-              <strong>10.19</strong>
-              <small>2026 / Mon</small>
-            </div>
-            <div className="deadline-credential">
-              <div className="credential-code">AZ-104</div>
-              <h2>Azure Administrator Associate</h2>
-              <StatusText status="更新可能" />
-              <p>有効期限までに更新アセスメントを完了します。</p>
-            </div>
-            <div className="days-left">
-              <span className="sr-only">有効期限まで</span>
-              <strong>41</strong>
-              <span>日</span>
-            </div>
-          </section>
+          {dashboard.nextDeadline?.currentExpiresOn ? (
+            <section className="next-action" aria-label="次に対応が必要な資格">
+              <div className="deadline-date">
+                <span>次の期限</span>
+                <strong>{formatMonthDay(dashboard.nextDeadline.currentExpiresOn)}</strong>
+                <small>{formatDeadlineMeta(dashboard.nextDeadline.currentExpiresOn)}</small>
+              </div>
+              <div className="deadline-credential">
+                <div className="credential-code">{dashboard.nextDeadline.displayCode ?? 'Credential'}</div>
+                <h2>{dashboard.nextDeadline.name}</h2>
+                <StatusText status={dashboard.nextDeadline.status} />
+                <p>{renewalNote(dashboard.nextDeadline)}</p>
+              </div>
+              <div className="days-left">
+                <span className="sr-only">有効期限まで</span>
+                <strong>{dashboard.nextDeadline.daysUntilExpiry ?? 0}</strong>
+                <span>日</span>
+              </div>
+            </section>
+          ) : (
+            <section className="next-action next-action-empty" aria-label="資格データ未登録">
+              <div>
+                <p className="context-label">Get started</p>
+                <h2>まだ資格データがありません</h2>
+                <p>Microsoft Learn の Transcript PDF を取り込むと、期限と更新予定をここに表示します。</p>
+              </div>
+            </section>
+          )}
         </section>
 
         <section id="schedule" className="timeline-section" aria-labelledby="timeline-title">
           <div className="section-heading">
             <div>
-              <p className="context-label">Sep — Nov 2026</p>
+              <p className="context-label">{timelineContext(referenceDate, timelineEnd)}</p>
               <h2 id="timeline-title">90日スケジュール</h2>
             </div>
-            <p>期限と予定を同じ時間軸で見る</p>
+            <p>更新開始と期限を同じ時間軸で見る</p>
           </div>
 
           <div className="timeline-visual" aria-hidden="true">
-            <div className="month-scale">
-              <span>9月</span>
-              <span>10月</span>
-              <span>11月</span>
+            <div
+              className="month-scale live-month-scale"
+              style={{ '--month-count': months.length } as CSSProperties}
+            >
+              {months.map((month) => <span key={month.id}>{month.label}</span>)}
             </div>
-            <div className="timeline-rail">
-              {timelinePositions.map(({ left, event }) => (
+            <div className="timeline-rail live-timeline-rail">
+              {dashboard.scheduleEvents.map((event) => (
                 <div
                   className={`timeline-pin timeline-pin-${event.kind}`}
-                  key={`${event.date}-${event.label}`}
-                  style={{ '--pin-left': left } as CSSProperties}
+                  key={event.id}
+                  style={{ '--pin-left': timelinePosition(referenceDate, event.date) } as CSSProperties}
                 />
               ))}
             </div>
           </div>
 
-          <ol className="timeline-events">
-            {scheduleEvents.map((event) => (
-              <li key={`${event.date}-${event.label}`}>
-                <time dateTime={`2026-${event.date.replace('.', '-')}`}>{event.date}</time>
-                <div>
-                  <strong>{event.label}</strong>
-                  <span>{event.detail}</span>
-                </div>
-                <span className={`event-key event-key-${event.kind}`}>
-                  {event.kind === 'deadline' ? '期限' : event.kind === 'renewal' ? '更新' : '予定'}
-                </span>
-              </li>
-            ))}
-          </ol>
+          {dashboard.scheduleEvents.length > 0 ? (
+            <ol className="timeline-events live-timeline-events">
+              {dashboard.scheduleEvents.map((event) => (
+                <li key={event.id}>
+                  <time dateTime={event.date}>{formatMonthDay(event.date)}</time>
+                  <div>
+                    <strong>{event.label}</strong>
+                    <span>{event.detail}</span>
+                  </div>
+                  <span className={`event-key event-key-${event.kind}`}>
+                    {event.kind === 'deadline' ? '期限' : '更新'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="section-empty">90日以内の更新開始・有効期限はありません。</div>
+          )}
         </section>
 
         <div className="content-grid">
           <section id="credentials" className="register-section" aria-labelledby="credentials-title">
             <div className="section-heading register-heading">
               <div>
-                <p className="context-label">4 credentials</p>
+                <p className="context-label">{dashboard.credentials.length} credentials</p>
                 <h2 id="credentials-title">資格一覧</h2>
               </div>
               <p>取得日・状態・期限を横並びで比較</p>
             </div>
 
-            <div className="table-wrap">
-              <table className="credential-table">
-                <thead>
-                  <tr>
-                    <th scope="col">資格</th>
-                    <th scope="col">取得日</th>
-                    <th scope="col">状態</th>
-                    <th scope="col">有効期限 / 次回</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {credentials.map((credential) => (
-                    <tr key={credential.code}>
-                      <td data-label="資格">
-                        <span className="credential-code">{credential.code}</span>
-                        <strong>{credential.name}</strong>
-                      </td>
-                      <td data-label="取得日" className="date-cell">
-                        {credential.earnedOn}
-                      </td>
-                      <td data-label="状態">
-                        <StatusText status={credential.status} />
-                      </td>
-                      <td data-label="有効期限 / 次回">
-                        <span className="date-cell">{credential.expiresOn ?? '—'}</span>
-                        <small>{credential.renewalNote}</small>
-                      </td>
+            {dashboard.credentials.length > 0 ? (
+              <div className="table-wrap">
+                <table className="credential-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">資格</th>
+                      <th scope="col">取得日</th>
+                      <th scope="col">状態</th>
+                      <th scope="col">有効期限 / 次回</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {dashboard.credentials.map((credential) => (
+                      <tr key={credential.id}>
+                        <td data-label="資格">
+                          <span className="credential-code">{credential.displayCode ?? '—'}</span>
+                          <strong>{credential.name}</strong>
+                        </td>
+                        <td data-label="取得日" className="date-cell">
+                          {formatFullDate(credential.firstEarnedOn)}
+                        </td>
+                        <td data-label="状態">
+                          <StatusText status={credential.status} />
+                        </td>
+                        <td data-label="有効期限 / 次回">
+                          <span className="date-cell">{formatFullDate(credential.currentExpiresOn)}</span>
+                          <small>{renewalNote(credential)}</small>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="register-empty">
+                <strong>登録済みの資格はありません</strong>
+                <span>「資格を取り込む」からTranscript PDFを選択してください。</span>
+              </div>
+            )}
           </section>
 
           <aside className="side-column" aria-label="今月と予定">
             <section className="calendar-section" aria-labelledby="calendar-title">
               <div className="section-heading compact-heading">
                 <div>
-                  <p className="context-label">September</p>
-                  <h2 id="calendar-title">2026年9月</h2>
+                  <p className="context-label">{calendar.monthName}</p>
+                  <h2 id="calendar-title">{calendar.year}年{calendar.month}月</h2>
                 </div>
-                <span className="today-key">基準日 08</span>
+                <span className="today-key">基準日 {String(calendar.referenceDay).padStart(2, '0')}</span>
               </div>
 
-              <table className="calendar" aria-label="2026年9月のカレンダー">
+              <table className="calendar" aria-label={`${calendar.year}年${calendar.month}月のカレンダー`}>
                 <thead>
                   <tr>
                     {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
@@ -241,17 +374,20 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calendarWeeks.map((week) => (
+                  {calendar.weeks.map((week) => (
                     <tr key={week.id}>
-                      {week.days.map(({ id, day }) => (
+                      {week.days.map(({ id, day, events }) => (
                         <td
-                          className={day === 8 ? 'is-today' : day === 22 ? 'has-event' : undefined}
+                          className={[
+                            day === calendar.referenceDay ? 'is-today' : '',
+                            events.length > 0 ? 'has-event' : '',
+                          ].filter(Boolean).join(' ') || undefined}
                           key={id}
                         >
                           {day ? <span>{day}</span> : null}
-                          {day === 22 ? (
+                          {events.length > 0 ? (
                             <span className="calendar-event">
-                              <span className="sr-only">SC-100 受験予定</span>
+                              <span className="sr-only">{events.map((event) => event.label).join('、')}</span>
                             </span>
                           ) : null}
                         </td>
@@ -269,24 +405,28 @@ export default function App() {
                   <h2 id="upcoming-title">直近の予定</h2>
                 </div>
               </div>
-              <ol className="upcoming-list">
-                {scheduleEvents.slice(0, 3).map((event) => (
-                  <li key={`upcoming-${event.date}-${event.label}`}>
-                    <time dateTime={`2026-${event.date.replace('.', '-')}`}>{event.date}</time>
-                    <div>
-                      <strong>{event.label}</strong>
-                      <span>{event.detail}</span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+              {dashboard.scheduleEvents.length > 0 ? (
+                <ol className="upcoming-list">
+                  {dashboard.scheduleEvents.slice(0, 3).map((event) => (
+                    <li key={`upcoming-${event.id}`}>
+                      <time dateTime={event.date}>{formatMonthDay(event.date)}</time>
+                      <div>
+                        <strong>{event.label}</strong>
+                        <span>{event.detail}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="upcoming-empty">直近90日以内の予定はありません。</div>
+              )}
             </section>
           </aside>
         </div>
       </main>
 
       <footer className="site-footer">
-        <span>UI mock · no account data connected</span>
+        <span>Browser-local data · Microsoft Learn PDF import</span>
         <span>Microsoft Credentials Tracker</span>
       </footer>
     </div>

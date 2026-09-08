@@ -1,6 +1,7 @@
 import type { TranscriptCredentialCandidate } from '../domain/transcript-import.ts';
 
 export const CREDENTIAL_STORAGE_KEY = 'ms-credentials-tracker:credentials:v1';
+export const CREDENTIAL_STORAGE_CHANGED_EVENT = 'ms-credentials-tracker:credentials-changed';
 
 export type CredentialImportSource =
   | 'learnTranscriptPaste'
@@ -63,6 +64,11 @@ function candidateIdentity(candidate: TranscriptCredentialCandidate): string {
   return `learn:${candidate.matchedDefinitionId}:${candidate.earnedOn}`;
 }
 
+function notifyCredentialStorageChanged(storage: Storage): void {
+  if (typeof window === 'undefined' || storage !== window.localStorage) return;
+  window.dispatchEvent(new Event(CREDENTIAL_STORAGE_CHANGED_EVENT));
+}
+
 export function saveConfirmedCredentialCandidates(
   candidates: TranscriptCredentialCandidate[],
   source: CredentialImportSource = 'learnTranscriptPdf',
@@ -102,6 +108,7 @@ export function saveConfirmedCredentialCandidates(
   const credentials = [...existing, ...additions];
   const envelope: CredentialStorageEnvelope = { version: 1, credentials };
   storage.setItem(CREDENTIAL_STORAGE_KEY, JSON.stringify(envelope));
+  notifyCredentialStorageChanged(storage);
 
   return { credentials, addedCount: additions.length, skippedCount };
 }

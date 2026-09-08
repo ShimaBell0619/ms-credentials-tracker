@@ -6,6 +6,10 @@ const viewports = [
   { name: 'narrow', width: 320, height: 800 },
 ];
 
+async function freezeDate(page) {
+  await page.clock.setFixedTime(new Date('2026-09-08T12:00:00Z'));
+}
+
 function pdfEscape(value) {
   return value.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)');
 }
@@ -49,15 +53,65 @@ function buildTextPdf(lines) {
   return Buffer.from(pdf, 'ascii');
 }
 
+function storedEnvelope() {
+  return {
+    version: 1,
+    credentials: [
+      {
+        id: 'test:az104',
+        credentialDefinitionId: 'cert.azure-administrator-associate',
+        source: 'learnTranscriptPdf',
+        sourceRecordId: null,
+        sourceTitle: 'AZ-104',
+        firstEarnedOn: '2023-11-19',
+        currentExpiresOn: '2026-11-20',
+        confirmedAt: '2026-09-08T00:00:00.000Z',
+      },
+      {
+        id: 'test:az305',
+        credentialDefinitionId: 'cert.azure-solutions-architect-expert',
+        source: 'learnTranscriptPdf',
+        sourceRecordId: null,
+        sourceTitle: 'AZ-305',
+        firstEarnedOn: '2024-06-28',
+        currentExpiresOn: '2027-06-29',
+        confirmedAt: '2026-09-08T00:00:00.000Z',
+      },
+      {
+        id: 'test:az500',
+        credentialDefinitionId: 'cert.azure-security-engineer-associate',
+        source: 'learnTranscriptPdf',
+        sourceRecordId: null,
+        sourceTitle: 'AZ-500',
+        firstEarnedOn: '2025-01-01',
+        currentExpiresOn: '2026-08-01',
+        confirmedAt: '2026-09-08T00:00:00.000Z',
+      },
+      {
+        id: 'test:az900',
+        credentialDefinitionId: 'cert.azure-fundamentals',
+        source: 'learnTranscriptPdf',
+        sourceRecordId: null,
+        sourceTitle: 'AZ-900',
+        firstEarnedOn: '2023-07-16',
+        currentExpiresOn: null,
+        confirmedAt: '2026-09-08T00:00:00.000Z',
+      },
+    ],
+  };
+}
+
 for (const viewport of viewports) {
-  test(`${viewport.name}: mock UI renders without horizontal overflow`, async ({ page }) => {
+  test(`${viewport.name}: empty local-data UI renders without horizontal overflow`, async ({ page }) => {
+    await freezeDate(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: '資格の更新予定' })).toBeVisible();
-    await expect(page.getByText('サンプル基準日')).toBeVisible();
-    await expect(page.getByText('Mock data')).toBeVisible();
+    await expect(page.getByText('基準日')).toBeVisible();
+    await expect(page.getByText('Local data')).toBeVisible();
     await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '資格一覧' })).toBeVisible();
 
     const widths = await page.evaluate(() => ({
@@ -68,14 +122,22 @@ for (const viewport of viewports) {
   });
 }
 
-test('status meaning is available as text', async ({ page }) => {
+test('derived status meaning is available as text', async ({ page }) => {
+  await freezeDate(page);
+  await page.addInitScript((data) => {
+    window.localStorage.setItem('ms-credentials-tracker:credentials:v1', JSON.stringify(data));
+  }, storedEnvelope());
   await page.goto('/');
+
   await expect(page.getByText('更新可能').first()).toBeVisible();
   await expect(page.getByText('有効').first()).toBeVisible();
-  await expect(page.getByText('期限なし')).toBeVisible();
+  await expect(page.getByText('期限切れ').first()).toBeVisible();
+  await expect(page.getByText('期限なし').first()).toBeVisible();
+  await expect(page.getByText('AZ-104 有効期限')).toBeVisible();
 });
 
 test('keyboard focus is visible on the skip link', async ({ page }) => {
+  await freezeDate(page);
   await page.goto('/');
   await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: '本文へ移動' });
@@ -83,7 +145,8 @@ test('keyboard focus is visible on the skip link', async ({ page }) => {
   await expect(skipLink).toBeVisible();
 });
 
-test('Transcript PDF import requires confirmation and persists matched credentials locally', async ({ page }) => {
+test('Transcript PDF import updates the live credential projection and persists locally', async ({ page }) => {
+  await freezeDate(page);
   const transcriptPdf = buildTextPdf([
     'Transcript',
     'Active certifications',
@@ -95,6 +158,7 @@ test('Transcript PDF import requires confirmation and persists matched credentia
   ]);
 
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
   await page.getByRole('button', { name: '資格を取り込む' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -114,17 +178,12 @@ test('Transcript PDF import requires confirmation and persists matched credentia
   await expect(dialog.locator('.candidate-title strong')).toHaveText(
     'Microsoft Certified: Azure Administrator Associate',
   );
-  await expect(dialog.locator('.candidate-list dd').filter({ hasText: '照合済み' })).toBeVisible();
-  await expect(dialog.locator('.exam-results strong')).toHaveText('AZ-104');
-
-  const beforeConfirm = await page.evaluate(() =>
-    window.localStorage.getItem('ms-credentials-tracker:credentials:v1'),
-  );
-  expect(beforeConfirm).toBeNull();
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
   await expect(dialog.getByText('1件をブラウザに保存しました。')).toBeVisible();
   await expect(page.locator('.saved-count')).toContainText('1');
+  await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
+  await expect(page.getByText('AZ-104 更新開始')).toBeVisible();
 
   const stored = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v1')),
@@ -133,9 +192,11 @@ test('Transcript PDF import requires confirmation and persists matched credentia
 
   await page.reload();
   await expect(page.locator('.saved-count')).toContainText('1');
+  await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
 });
 
 test('Transcript PDF import rejects non-PDF files', async ({ page }) => {
+  await freezeDate(page);
   await page.goto('/');
   await page.getByRole('button', { name: '資格を取り込む' }).click();
   const dialog = page.getByRole('dialog');
