@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   verify:
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@d9c7d8c6308332f9efb2b8501372f30183b99aea
     with:
       node_version_file: .node-version
       cache_dependency_path: package-lock.json
@@ -25,7 +25,7 @@ jobs:
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.full_name == github.repository)
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@d9c7d8c6308332f9efb2b8501372f30183b99aea
     with:
       node_version_file: .node-version
       cache_dependency_path: package-lock.json
