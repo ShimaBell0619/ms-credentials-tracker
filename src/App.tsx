@@ -98,8 +98,18 @@ export default function App() {
       <main id="main-content" className="page-frame">
         <section className="overview" aria-labelledby="overview-title">
           <div className="overview-copy">
-            <h1 id="overview-title">資格の更新予定</h1>
-            <p>
+            <h1
+              id="overview-title"
+              style={{
+                fontSize: '24px',
+                lineHeight: 1.3,
+                letterSpacing: '-0.025em',
+                fontWeight: 700,
+              }}
+            >
+              資格の更新予定
+            </h1>
+            <p className="date-cell" style={{ marginTop: '10px', fontSize: '11px', lineHeight: 1.4 }}>
               サンプル基準日 <time dateTime="2026-09-08">2026.09.08</time>
             </p>
           </div>
@@ -217,7 +227,7 @@ export default function App() {
                   <p className="context-label">September</p>
                   <h2 id="calendar-title">2026年9月</h2>
                 </div>
-                <span className="reference-key">基準日 08</span>
+                <span className="today-key">基準日 08</span>
               </div>
 
               <table className="calendar" aria-label="2026年9月のカレンダー">
@@ -233,7 +243,7 @@ export default function App() {
                     <tr key={week.id}>
                       {week.days.map(({ id, day }) => (
                         <td
-                          className={day === 8 ? 'is-reference' : day === 22 ? 'has-event' : undefined}
+                          className={day === 8 ? 'is-today' : day === 22 ? 'has-event' : undefined}
                           key={id}
                         >
                           {day ? <span>{day}</span> : null}
