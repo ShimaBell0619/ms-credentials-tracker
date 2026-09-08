@@ -160,6 +160,7 @@ export function buildCredentialDashboard(
   horizonDays = 90,
 ): CredentialDashboardProjection {
   const credentials = records
+    .filter((record) => !record.archivedAt)
     .map((record) => projectCredential(record, referenceDate))
     .filter((credential): credential is CredentialProjection => credential !== null)
     .sort((left, right) => {
