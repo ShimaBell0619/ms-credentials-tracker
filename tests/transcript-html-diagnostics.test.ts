@@ -19,18 +19,41 @@ test('detects localized transcript markers without exposing transcript content',
   assert.equal(diagnostic.containsMicrosoftCertified, true);
   assert.equal(diagnostic.containsJapaneseDate, true);
   assert.equal(diagnostic.containsPassedExams, false);
+  assert.equal(diagnostic.scriptCount, 0);
+  assert.equal(diagnostic.iframeCount, 0);
   assert.match(describeTranscriptDiagnostic(diagnostic), /ローカライズ/);
 });
 
 test('distinguishes a client-rendered shell from localized transcript text', () => {
   const html = `<!doctype html>
     <html lang="ja-jp">
-      <body><div id="root"></div><script type="application/json">{}</script></body>
+      <body>
+        <div id="root"></div>
+        <script src="/assets/profile-runtime.js"></script>
+        <script>window.fetch('/api/profile');</script>
+      </body>
     </html>`;
 
   const diagnostic = analyzeTranscriptHtml(html);
   assert.equal(diagnostic.containsMicrosoftCertified, false);
   assert.equal(diagnostic.containsJapaneseDate, false);
-  assert.equal(diagnostic.containsHydrationData, true);
-  assert.match(describeTranscriptDiagnostic(diagnostic), /後から描画/);
+  assert.equal(diagnostic.scriptCount, 2);
+  assert.equal(diagnostic.externalScriptCount, 1);
+  assert.equal(diagnostic.inlineScriptCount, 1);
+  assert.equal(diagnostic.containsApiHint, true);
+  assert.equal(diagnostic.bodyTextLength, 0);
+  assert.match(describeTranscriptDiagnostic(diagnostic), /JavaScript実行後/);
+});
+
+test('detects iframe and error-page structures without returning page content', () => {
+  const iframeHtml = '<html><body><iframe src="/profile/transcript-frame"></iframe></body></html>';
+  const iframeDiagnostic = analyzeTranscriptHtml(iframeHtml);
+  assert.equal(iframeDiagnostic.iframeCount, 1);
+  assert.equal(iframeDiagnostic.containsIframeTranscriptHint, true);
+  assert.match(describeTranscriptDiagnostic(iframeDiagnostic), /別フレーム/);
+
+  const errorHtml = '<html lang="en-us"><body><h1>404 - Page not found</h1></body></html>';
+  const errorDiagnostic = analyzeTranscriptHtml(errorHtml);
+  assert.equal(errorDiagnostic.containsNotFoundOrDeniedMarker, true);
+  assert.match(describeTranscriptDiagnostic(errorDiagnostic), /エラー/);
 });
