@@ -56,16 +56,29 @@ const MONTH_SOURCE =
 const JAPANESE_DATE_SOURCE = '\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日';
 const DATE_SOURCE = `(?:${MONTH_SOURCE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${MONTH_SOURCE}\\s+\\d{4}|\\d{4}-\\d{2}-\\d{2}|${JAPANESE_DATE_SOURCE})`;
 const NO_DATE_SOURCE = '(?:N\\/?A|該当なし|なし)';
-const EXTERNAL_NUMBER_SOURCE = '(?:[A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+|[A-Z0-9]{12,})';
+const EXTERNAL_NUMBER_SOURCE =
+  '(?:[A-Z0-9]{4,}(?:\\s*-\\s*[A-Z0-9]{4,})+|[A-Z0-9]{12,})';
 const EARNED_LABEL_SOURCE = '(?:(?:Earned on|取得日|取得日付)\\s*[:：]?\\s*)?';
 const EXPIRES_LABEL_SOURCE = '(?:(?:Expires on|有効期限|有効期限日)\\s*[:：]?\\s*)?';
 
 function normalizeWhitespace(value: string): string {
-  return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  return value
+    .replace(/\u00a0/g, ' ')
+    .replace(/([A-Z0-9])[\uFFFD\uFFFE\uFFFF]([A-Z0-9])/gi, '$1-$2')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeTitleForCompare(value: string): string {
-  return normalizeWhitespace(value).normalize('NFKC').toLocaleLowerCase('en-US');
+  return normalizeWhitespace(value)
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .toLocaleLowerCase('en-US');
+}
+
+function normalizeExternalNumber(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return normalizeWhitespace(value).replace(/\s*-\s*/g, '-');
 }
 
 function canonicalTitleInside(
@@ -77,7 +90,9 @@ function canonicalTitleInside(
     credentialDefinitions.find(
       (definition) =>
         definition.kind === kind &&
-        normalized.includes(normalizeTitleForCompare(definition.canonicalTitle)),
+        [definition.canonicalTitle, ...(definition.aliases ?? [])].some((candidate) =>
+          normalized.includes(normalizeTitleForCompare(candidate)),
+        ),
     )?.canonicalTitle ?? null
   );
 }
@@ -118,12 +133,13 @@ function buildCredentialCandidate(
   expiresOn: string | null,
 ): TranscriptCredentialCandidate {
   const rawTitle = normalizeWhitespace(detectedTitle);
-  const title = canonicalTitleInside(kind, rawTitle) ?? rawTitle;
-  const definition = matchCredentialDefinition(title);
+  const directDefinition = matchCredentialDefinition(rawTitle);
+  const canonicalTitle = directDefinition?.canonicalTitle ?? canonicalTitleInside(kind, rawTitle);
+  const definition = directDefinition ?? (canonicalTitle ? matchCredentialDefinition(canonicalTitle) : null);
   return {
     kind,
-    detectedTitle: title,
-    externalNumber,
+    detectedTitle: definition?.canonicalTitle ?? rawTitle,
+    externalNumber: normalizeExternalNumber(externalNumber),
     earnedOn,
     expiresOn,
     matchedDefinitionId: definition?.id ?? null,
@@ -131,7 +147,46 @@ function buildCredentialCandidate(
   };
 }
 
-function parseCertifications(compactText: string): TranscriptCredentialCandidate[] {
+function getActiveCertificationSection(compactText: string): string {
+  const startPattern = new RegExp(
+    `(?:\\bActive certifications\\b|アクティブな認定資格|有効な認定資格)\\s+` +
+      `(?:Certification title|認定資格(?:の)?タイトル)\\s+` +
+      `(?:Certification number|認定資格番号|資格証明番号|資格情報番号)\\s+` +
+      `(?:Earned on|取得日|取得日付)\\s+` +
+      `(?:Expires on|有効期限|有効期限日)`,
+    'i',
+  );
+  const startMatch = startPattern.exec(compactText);
+  if (!startMatch) return '';
+
+  const remainder = compactText.slice(startMatch.index + startMatch[0].length);
+  const endMatch = /\b(?:Passed exams|Applied Skills|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|合格した試験|合格済みの試験|応用スキル|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
+    remainder,
+  );
+  return endMatch ? remainder.slice(0, endMatch.index) : remainder;
+}
+
+function parseCertificationTable(compactText: string): TranscriptCredentialCandidate[] {
+  const section = getActiveCertificationSection(compactText);
+  if (!section) return [];
+
+  const pattern = new RegExp(
+    `(.+?)\\s+(${EXTERNAL_NUMBER_SOURCE})\\s+(${DATE_SOURCE})\\s+(${NO_DATE_SOURCE}|${DATE_SOURCE})`,
+    'gi',
+  );
+
+  return Array.from(section.matchAll(pattern), (match) =>
+    buildCredentialCandidate(
+      'certification',
+      match[1],
+      match[2],
+      normalizeTranscriptDate(match[3]),
+      normalizeTranscriptDate(match[4]),
+    ),
+  );
+}
+
+function parseCertificationFallback(compactText: string): TranscriptCredentialCandidate[] {
   const pattern = new RegExp(
     `(Microsoft Certified:\\s+.+?)\\s+(${EXTERNAL_NUMBER_SOURCE})\\s+${EARNED_LABEL_SOURCE}(${DATE_SOURCE})\\s+${EXPIRES_LABEL_SOURCE}(${NO_DATE_SOURCE}|${DATE_SOURCE})`,
     'gi',
@@ -146,6 +201,11 @@ function parseCertifications(compactText: string): TranscriptCredentialCandidate
       normalizeTranscriptDate(match[4]),
     ),
   );
+}
+
+function parseCertifications(compactText: string): TranscriptCredentialCandidate[] {
+  const tableCandidates = parseCertificationTable(compactText);
+  return tableCandidates.length > 0 ? tableCandidates : parseCertificationFallback(compactText);
 }
 
 function parseAppliedSkills(compactText: string): TranscriptCredentialCandidate[] {
@@ -168,24 +228,26 @@ function parseAppliedSkills(compactText: string): TranscriptCredentialCandidate[
 }
 
 function getPassedExamSection(compactText: string): string {
-  const startMatch = /\bPassed exams\b|合格した試験|合格済みの試験/i.exec(compactText);
+  const startPattern = new RegExp(
+    `(?:\\bPassed exams\\b|合格した試験|合格済みの試験)\\s+` +
+      `(?:Exam title|試験(?:の)?タイトル)\\s+` +
+      `(?:Exam number|試験番号)\\s+` +
+      `(?:Passed date|合格日)`,
+    'i',
+  );
+  const startMatch = startPattern.exec(compactText);
   if (!startMatch) return '';
 
-  const start = startMatch.index + startMatch[0].length;
-  const remainder = compactText.slice(start);
-  const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|応用スキル|有効な認定資格|過去の認定資格|完了したラーニング パス/i.exec(
+  const remainder = compactText.slice(startMatch.index + startMatch[0].length);
+  const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|応用スキル|有効な認定資格|アクティブな認定資格|認定資格の履歴|過去の認定資格|完了したラーニング パス/i.exec(
     remainder,
   );
   return endMatch ? remainder.slice(0, endMatch.index) : remainder;
 }
 
 function parseExams(compactText: string): TranscriptExamCandidate[] {
-  let section = getPassedExamSection(compactText);
+  const section = getPassedExamSection(compactText);
   if (!section) return [];
-  section = section.replace(
-    /^\s*(?:Exam title\s+Exam number\s+Passed date|試験タイトル\s+試験番号\s+合格日)\s*/i,
-    '',
-  );
 
   const pattern = new RegExp(`(.+?)\\s+([A-Z]{1,5}-\\d{2,4})\\s+(${DATE_SOURCE})`, 'gi');
   return Array.from(section.matchAll(pattern), (match) => ({
