@@ -74,6 +74,7 @@ try {
 
   await capture(page, { width: 1440, height: 1000 }, 'desktop.png');
   await capture(page, { width: 390, height: 844 }, 'mobile.png');
+  await capture(page, { width: 320, height: 800 }, 'narrow.png');
 } finally {
   await browser?.close();
   await stopServer();
