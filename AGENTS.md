@@ -7,15 +7,18 @@ Foundation-Commit: 5382fc2c0735ce82c54dd05c07cb369d4b3b536a
 
 1. `PRODUCT.md`
 2. `DESIGN.md`
-3. `AGENTS.md`
-4. relevant Issue / PR
-5. Foundation specialist guidance when needed
+3. `docs/DOMAIN.md`
+4. `AGENTS.md`
+5. relevant Issue / PR
+6. Foundation specialist guidance when needed
 
 ## Current baseline
 
 PR #5 is the selected initial UI baseline after comparing independent mock implementations. PR #2 is superseded and should not be used as the implementation source for follow-up work.
 
 Preserve the date-led information hierarchy defined in `DESIGN.md` unless a later approved product/design decision explicitly changes it.
+
+The approved credential-domain and MVP data-boundary decisions are recorded in `docs/DOMAIN.md`. Do not recreate domain entities from the original UI-only `mock-data.ts` shape.
 
 ## Documentation language
 
@@ -30,18 +33,33 @@ Preserve the date-led information hierarchy defined in `DESIGN.md` unless a late
 - Material UI changes require rendered review around 1440px, 390px, and 320px.
 - Check horizontal overflow, Japanese/CJK wrapping, keyboard focus, and state meaning without color-only dependence.
 - Use render → critique → fix → re-render before completion.
+- Import/reconciliation is a supporting workflow and must not displace the next-deadline-first hierarchy on the main schedule view.
 
 ## Domain logic
 
-- Introduce domain logic in follow-up Issues/PRs rather than expanding the UI-baseline PR.
-- Define the credential domain model and application source of truth before adding authentication or Microsoft integrations.
-- Once independently testable domain logic is introduced, enable unit tests and remove the current UI-only unit-test opt-out.
-- Do not introduce authentication, persistence, external APIs, or other material architecture decisions without the required explicit approval.
+- Treat `CredentialDefinition`, user-earned credentials, credential history, exams/plans, and import candidates as separate concepts according to `docs/DOMAIN.md`.
+- Store confirmed facts; derive status, renewal timing, remaining days, next action, and schedule projections.
+- Microsoft-side data is input for assisted import/reconciliation and must not silently overwrite confirmed application data.
+- Unknown imported credentials remain unresolved until explicitly mapped; do not invent identities from names or exam codes.
+- Unit tests are required for independently testable domain logic.
+
+## Transcript PDF import
+
+- The approved MVP assisted-input path is a Microsoft Learn Transcript PDF saved by the user.
+- Parse the selected PDF locally in the browser; do not upload the PDF to a backend in this milestone.
+- Keep PDF extraction separate from Transcript normalization and catalog reconciliation.
+- Treat PDF layout as external input rather than an API contract; parsing must be conservative and tested against representative layouts.
+- Do not add OCR, browser automation, shared-page scraping, or undocumented Microsoft Learn endpoints without a new explicit decision.
+
+## MVP persistence
+
+- The current approved MVP source of truth is versioned browser-local storage after explicit user confirmation.
+- Keep domain parsing/normalization independent from the browser-storage adapter so server-side persistence can replace it later.
+- Do not introduce authentication, a server-side database/API, automatic synchronization, or other material architecture decisions without explicit approval.
 
 ## Engineering
 
 - React + TypeScript + Vite + npm baseline.
 - Pin reusable Foundation workflows to the recorded full commit SHA.
-- `check`, `typecheck`, `build`, and browser-rendered E2E must pass.
-- The UI-only baseline may keep unit tests opted out only while there is no independently testable domain logic; record the reason in CI.
+- `check`, `typecheck`, `test`, `build`, and browser-rendered E2E must pass once domain logic exists.
 - Do not merge without explicit approval.

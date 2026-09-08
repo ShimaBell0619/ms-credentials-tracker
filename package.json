@@ -7,12 +7,14 @@
     "dev": "vite",
     "check": "biome lint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/transcript-import.test.ts",
     "build": "vite build",
     "postbuild": "node scripts/verify-pages-build.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright install --with-deps chromium && playwright test"
   },
   "dependencies": {
+    "pdfjs-dist": "6.3.289",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

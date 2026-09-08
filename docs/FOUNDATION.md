@@ -14,6 +14,6 @@
 
 ## App-specific deviations
 
-- Unit/component tests are currently opted out because the selected baseline is still UI-only and contains no independently testable domain logic.
-- Browser-rendered E2E remains enabled.
-- The unit-test opt-out must be removed when domain logic is introduced.
+There are currently no quality-gate deviations for the domain-enabled application.
+
+The previous UI-only unit-test opt-out ended when independently testable transcript parsing and domain normalization were introduced. `check`, `typecheck`, `test`, `build`, and browser-rendered E2E are now required by the consumer CI contract.
