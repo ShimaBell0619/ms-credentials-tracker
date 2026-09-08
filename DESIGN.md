@@ -66,14 +66,15 @@ Credential import is a supporting workflow, not a new dashboard section. Entry t
 - Credential table: compare credential, earned date, status, and expiry/next action.
 - Calendar: locate current sample-month events. Static mock UI must label the reference date as a sample/reference date rather than "today".
 - Upcoming list: concrete near-term events in chronological order.
-- Transcript import dialog: accept an official Microsoft Learn Transcript share URL, retrieve and parse external content into candidates when browser policy allows, show matched/unresolved state in text, and require explicit confirmation before browser-local save.
+- Transcript import dialog: select a Microsoft Learn Transcript PDF, explain that parsing stays in the browser, show matched/unresolved state in text, and require explicit confirmation before browser-local save.
 
 ## Do
 
 - Express the date-led hierarchy through layout, not explanatory copy.
 - Pair deadline/renewal/event type colors with text labels.
-- Review rendered Japanese wrapping, long credential names, focus, and overflow.
+- Review rendered Japanese wrapping, long credential names, focus, file-input overflow, and dialog overflow.
 - Make external-data confirmation status explicit in text.
+- State clearly that the selected PDF is processed locally and the file itself is not retained.
 - After material UI changes, use render → critique → fix → re-render.
 - Require a product, data, workflow, or accessibility reason before adding decorative UI weight.
 
@@ -86,4 +87,5 @@ Credential import is a supporting workflow, not a new dashboard section. Entry t
 - Do not give status more visual weight than its information value through pills.
 - Do not imitate the Microsoft Learn UI.
 - Do not explain the date-led design concept with marketing hero copy.
+- Do not upload a Transcript PDF to an application backend for this MVP.
 - Do not let parsed external data appear as confirmed application state before explicit user confirmation.
