@@ -38,7 +38,7 @@ function stringValue(record: JsonRecord, names: readonly string[]): string | nul
 
 function normalizeApiDate(value: string | null): string | null {
   if (!value) return null;
-  const isoDate = value.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
+  const isoDate = value.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
   return isoDate ?? normalizeTranscriptDate(value);
 }
 
