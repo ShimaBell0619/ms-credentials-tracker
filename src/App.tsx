@@ -246,12 +246,20 @@ export default function App() {
                 <span>日</span>
               </div>
             </section>
-          ) : (
+          ) : dashboard.credentials.length === 0 ? (
             <section className="next-action next-action-empty" aria-label="資格データ未登録">
               <div>
                 <p className="context-label">Get started</p>
                 <h2>まだ資格データがありません</h2>
                 <p>Microsoft Learn の Transcript PDF を取り込むと、期限と更新予定をここに表示します。</p>
+              </div>
+            </section>
+          ) : (
+            <section className="next-action next-action-empty" aria-label="今後の資格期限なし">
+              <div>
+                <p className="context-label">No upcoming deadline</p>
+                <h2>今後の有効期限はありません</h2>
+                <p>登録済み資格の状態は資格一覧で確認できます。</p>
               </div>
             </section>
           )}
