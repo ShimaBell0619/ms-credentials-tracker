@@ -108,7 +108,7 @@ for (const viewport of viewports) {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: '資格の更新予定' })).toBeVisible();
-    await expect(page.getByText('基準日')).toBeVisible();
+    await expect(page.getByText('基準日 2026.09.08')).toBeVisible();
     await expect(page.getByText('Local data')).toBeVisible();
     await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
@@ -133,7 +133,7 @@ test('derived status meaning is available as text', async ({ page }) => {
   await expect(page.getByText('有効').first()).toBeVisible();
   await expect(page.getByText('期限切れ').first()).toBeVisible();
   await expect(page.getByText('期限なし').first()).toBeVisible();
-  await expect(page.getByText('AZ-104 有効期限')).toBeVisible();
+  await expect(page.getByText('AZ-104 有効期限').first()).toBeVisible();
 });
 
 test('keyboard focus is visible on the skip link', async ({ page }) => {
@@ -183,7 +183,7 @@ test('Transcript PDF import updates the live credential projection and persists 
   await expect(dialog.getByText('1件をブラウザに保存しました。')).toBeVisible();
   await expect(page.locator('.saved-count')).toContainText('1');
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
-  await expect(page.getByText('AZ-104 更新開始')).toBeVisible();
+  await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
   const stored = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v1')),
