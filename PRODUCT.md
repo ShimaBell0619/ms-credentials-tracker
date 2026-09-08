@@ -2,36 +2,46 @@
 
 ## Purpose
 
-Microsoft資格の取得状況と、次に必要な更新・期限・受験予定を一か所で確認できる個人向けWebアプリを目指す。
+Build a personal web application that lets a user quickly understand Microsoft certification status, the next renewal or expiry action, and planned certification events in one place.
 
 ## Current milestone
 
-Issue #4ではUIモックだけを実装する。実データとの接続は行わず、将来の認証・資格取得・更新履歴連携を検討できる情報設計を検証する。
+This pull request establishes the initial UI baseline using static mock data. It validates the information architecture and responsive presentation before authentication, external integrations, persistence, or real renewal logic are introduced.
+
+The selected baseline is date-led: the user should identify the next required credential action first, then inspect the 90-day schedule and individual credential records.
 
 ## Primary user task
 
-画面を開いたユーザーが、次に対応が必要な資格と日付を短時間で把握し、その後に各資格の取得日・状態・期限を確認できること。
+When the user opens the application, they should be able to identify the next credential that needs attention and its date within a few seconds, then review each credential's earned date, status, and expiry information.
 
-## Mock scope
+## UI baseline scope
 
-- 資格の状態
-- 取得日
-- 有効期限
-- 更新可能時期や更新不要の説明
-- 更新期限・更新開始・受験予定を含むスケジュール
-- 月カレンダー
+- credential status
+- earned date
+- expiry date
+- renewal availability or non-expiring status
+- renewal, expiry, and planned exam events
+- 90-day schedule
+- monthly calendar
+- responsive layouts for desktop and narrow/mobile widths
 
-すべて静的なモックデータであり、実際のMicrosoftアカウント情報ではないことを画面上で明示する。
+All credential information is static mock data. The UI must clearly avoid presenting it as live Microsoft account data.
 
-## Non-goals for this milestone
+## Non-goals for the UI baseline
 
-- Microsoft / Entra認証
-- Microsoft Graph / Microsoft Learn API連携
-- データベースや永続化
-- 実際の有効期限計算や更新判定
-- 通知・メール・ICS生成
-- 資格の追加・編集・削除操作
+- Microsoft / Entra authentication
+- Microsoft Graph or Microsoft Learn integration
+- database or persistence
+- real expiry calculations or renewal-state calculations
+- notifications, email, or ICS generation
+- credential add/edit/delete workflows
 
 ## Future direction
 
-実装段階ではアプリ側DBを資格状態のsource of truthとして扱うことを前提候補とし、Microsoft側から取得可能なデータは補助入力・同期手段として評価する。現在のモックではその方式を確定しない。
+The next implementation phase should define the domain model and application source of truth before adding authentication or Microsoft integrations. The leading architecture direction is to keep the application's database as the source of truth for credential state and renewal history, while treating data obtainable from Microsoft as an assisted import or synchronization source where supported.
+
+This direction remains subject to explicit design approval before persistence or external integrations are implemented.
+
+## Language policy
+
+Repository engineering and design documentation should be written in English. User-facing UI copy remains Japanese unless the product language direction is explicitly changed.

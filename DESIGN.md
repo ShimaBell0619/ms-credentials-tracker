@@ -9,76 +9,74 @@ omitted: []
 
 ## Overview
 
-**Design direction: 次に行動が必要な日付から逆算して読む、資格更新スケジュール。**
+**Design direction: a date-led credential renewal schedule that starts with the next required action.**
 
-この画面は一般的なSaaS dashboardではなく、資格更新の予定表として設計する。最初に「何を・いつまでに」を読み、その後に90日スケジュール、資格台帳、月カレンダーへ詳細化する。
+This screen is not a generic SaaS dashboard. It is a personal certification renewal schedule. The first question is "what needs attention, and by when?" The interface then expands into a 90-day schedule, credential register, monthly calendar, and upcoming events.
 
-第一視線は次の期限。第二視線は90日内の更新・期限・受験予定。資格総数などの集計値は主目的ではないため、均等なKPIカードは置かない。
+The first visual priority is the next deadline. The second is renewal, expiry, and planned exam activity within the next 90 days. Aggregate counts are secondary, so the design does not use equal-weight KPI cards.
 
-ページ先頭はコンセプトを説明するhero copyではなく、機能名「資格の更新予定」とサンプル基準日だけを静かに置く。日付中心の設計意図は説明文ではなく、直下の期限recordと時間軸そのもので伝える。
+The page introduction should remain quiet: show the functional title `資格の更新予定` and the sample reference date, then let the deadline record and timeline communicate the date-led concept. Do not explain the design concept with marketing-style hero copy.
 
 ## Colors
 
-- Neutral paper: warm gray / off-white。予定表・台帳として長時間見ても騒がしくならない背景。
-- Azure blue: 現在位置・更新開始・資格コードなどMicrosoft資格との関連がある情報に限定。
-- Warning orange: 期限や対応が必要な状態。
-- Green: 有効状態。
-- Slate: 期限なし・補助情報。
-- 状態は必ずテキストと併記し、色単独では意味を伝えない。
+- Neutral paper: warm gray / off-white for a calm schedule and register surface.
+- Azure blue: reserved for current/reference position, renewal-start events, and credential codes where Microsoft context is meaningful.
+- Warning orange: deadlines or states that require attention.
+- Green: active/valid state.
+- Slate: non-expiring and secondary information.
+- Status meaning must always be available in text; color is never the only signal.
 
 ## Typography
 
-- UI / Japanese: Segoe UI Variableを先頭に、Yu Gothic UI / Hiragino Sans / Noto Sans JPを明示的fallbackとする。
-- 日付・資格コード・日数: monospace。比較対象として桁位置を安定させる。
-- 見出しはmarketing heroの大きさにせず、情報の開始点として使う。
-- 長いMicrosoft資格名は省略せず、狭幅で自然にwrapさせる。
+- UI / Japanese: `Segoe UI Variable` first, with `Yu Gothic UI`, `Hiragino Sans`, and `Noto Sans JP` as explicit fallbacks.
+- Dates, credential codes, and day counts: monospace to keep comparison values aligned.
+- Headings should act as information entry points, not marketing hero typography.
+- Long Microsoft credential names must wrap naturally on narrow screens instead of being truncated.
 
 ## Layout
 
-- Desktop: 次の期限 → 90日スケジュール → 資格一覧 + 月カレンダー/直近予定。
-- 90日スケジュールは全資格情報と同じカードにせず、時間軸そのものを独立した構造として見せる。
-- 資格一覧は比較可能性を優先してtableを使う。
-- Mobile: 次の期限を先頭に保持し、tableは各recordをラベル付き縦組みに変換する。
-- 1440 / 390 / 320pxを最低review baselineとし、horizontal overflowを許容しない。
+- Desktop: next deadline → 90-day schedule → credential register + monthly calendar/upcoming events.
+- Keep the 90-day schedule as its own time-based structure rather than placing every credential detail into the same card pattern.
+- Use a table for the credential register because comparison across records is a primary task.
+- Mobile: preserve the next deadline first, then transform the table into labeled vertical records.
+- Review at approximately 1440px, 390px, and 320px. Horizontal page overflow is not acceptable.
 
-## Elevation & Depth
+## Elevation and depth
 
-- Shadowを階層表現の基本にしない。
-- border、rule、background差、spacingで情報を分ける。
-- 次の期限だけwarning top ruleと淡い期限面で優先度を示す。
+- Do not use shadows as the default hierarchy mechanism.
+- Separate information with borders, rules, background differences, and spacing.
+- Only the next deadline receives the warning top rule and a light deadline surface to indicate priority.
 
 ## Shapes
 
-- 基本は直線的なschedule / register表現。
-- pillは状態表示に使わず、status dot + textを使う。
-- 円形はcalendar event markerなど、位置を示す小さな記号に限定する。
+- Prefer straight schedule/register geometry.
+- Do not turn status into pills; use status dot + text.
+- Reserve circles for small positional markers such as calendar events.
 
 ## Components
 
-- Header: product identity、mock表示、セクション内navigation。
-- Page introduction: 機能名とサンプル基準日だけを表示し、hero copyや説明文で設計意図を重複説明しない。
-- Next action: 日付・資格・残日数を一つの期限recordとして表示。
-- 90-day schedule: 時間軸とaccessibility向けevent list。
-- Credential table: 資格、取得日、状態、有効期限/次回を比較。
-- Calendar: 今月の予定位置を確認。静的モックでは「今日」ではなくサンプル基準日として表示する。
-- Upcoming list: 直近の具体的予定を時系列表示。
+- Header: product identity, mock-state indicator, and in-page navigation.
+- Page introduction: functional title plus sample reference date only; do not repeat the design concept in explanatory hero copy.
+- Next action: date, credential, and remaining days presented as one deadline record.
+- 90-day schedule: visual time axis plus an accessible event list.
+- Credential table: compare credential, earned date, status, and expiry/next action.
+- Calendar: locate current sample-month events. Static mock UI must label the reference date as a sample/reference date rather than "today".
+- Upcoming list: concrete near-term events in chronological order.
 
-## Do's and Don'ts
+## Do
 
-### Do
+- Express the date-led hierarchy through layout, not explanatory copy.
+- Pair deadline/renewal/event type colors with text labels.
+- Review rendered Japanese wrapping, long credential names, focus, and overflow.
+- After material UI changes, use render → critique → fix → re-render.
+- Require a product, data, workflow, or accessibility reason before adding decorative UI weight.
 
-- 日付が主役である理由を画面構造に反映する。
-- 期限・更新・予定の種類を色だけでなく文言でも示す。
-- 実描画で日本語改行、長い資格名、focus、overflowを確認する。
-- UI変更後は render → critique → fix → re-render を行う。
-- 装飾を追加する前にproduct/data/workflow上の理由を説明できるか確認する。
+## Don't
 
-### Don't
-
-- 均等なKPIカードをdashboardらしさのためだけに並べない。
-- gradient / glow / abstract illustrationを装飾目的で追加しない。
-- 資格コードを架空の紋章・ロゴとして扱わない。
-- 有効期間をtask progressのようなprogress barで表現しない。
-- statusをpill化して情報量以上の視覚重量を与えない。
-- Microsoft Learnの既存画面を模倣しない。
-- 日付中心の設計コンセプトをmarketing hero copyで説明しない。
+- Do not add equal KPI cards simply to make the screen look like a dashboard.
+- Do not add gradients, glow, or abstract illustration as decoration.
+- Do not present credential codes as invented crests, badges, or logos.
+- Do not represent credential validity as task progress with a progress bar.
+- Do not give status more visual weight than its information value through pills.
+- Do not imitate the Microsoft Learn UI.
+- Do not explain the date-led design concept with marketing hero copy.

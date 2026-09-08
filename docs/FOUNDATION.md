@@ -1,9 +1,19 @@
 # Foundation provenance
 
-- Adopted Foundation version: 0.2.0
-- Copied-rule/template commit: `a0c5ab5f4757131c7e1703eeeff69e0b2540b505`
-- Reusable workflow commit: `a0c5ab5f4757131c7e1703eeeff69e0b2540b505`
+- Adopted Foundation version: 0.3.1
+- Foundation commit: `5382fc2c0735ce82c54dd05c07cb369d4b3b536a`
+- Reusable workflow commit: `5382fc2c0735ce82c54dd05c07cb369d4b3b536a`
 - Adopted on: 2026-09-08
-- App-specific deviations:
-  - This comparison experiment uses the latest reviewed Foundation main commit after the Pages/UI-review guidance changes, before those changes are packaged into a later Foundation release.
-  - Unit/component tests are opted out for the UI-only mock; rendered E2E remains enabled.
+
+## Pages adoption
+
+- The trusted Pages publisher caller is installed on the default branch before PR preview publication.
+- UI/consumer PRs build an unprivileged Pages candidate.
+- The default-branch `workflow_run` publisher validates provenance before publishing production or `/pr-N/` preview content.
+- The privileged publisher does not checkout or execute PR code.
+
+## App-specific deviations
+
+- Unit/component tests are currently opted out because the selected baseline is still UI-only and contains no independently testable domain logic.
+- Browser-rendered E2E remains enabled.
+- The unit-test opt-out must be removed when domain logic is introduced.

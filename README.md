@@ -1,10 +1,12 @@
 # Microsoft Credentials Tracker
 
-UI-only prototype for reviewing Microsoft certification status, renewal windows, expiry dates, and planned certification events.
+A UI-first web application for reviewing Microsoft certification status, renewal windows, expiry dates, and planned certification events.
 
-## Experiment branch
+## Current state
 
-`experiment/foundation-first-mock-ui` is a from-scratch comparison implementation for Issue #4. Its UI was designed from the untouched repository baseline using the latest Web App Foundation guidance; PR #2's UI is intentionally not used as a visual or structural source during implementation.
+The initial responsive UI baseline is implemented with static mock data. It is intentionally designed around the next required credential action rather than a generic KPI dashboard.
+
+The next development phase should introduce domain logic incrementally, starting with the credential data model and application source-of-truth design before authentication, persistence, or Microsoft integrations.
 
 ## Development
 
@@ -22,4 +24,10 @@ npm run build
 npm run test:e2e
 ```
 
-All displayed credential information is static mock data. No Microsoft account, API, authentication, or database integration is implemented.
+## Current limitations
+
+All displayed credential information is static mock data. No Microsoft account, API, authentication, persistence, real renewal calculation, or notification integration is implemented yet.
+
+## Documentation language
+
+Repository engineering and design documentation is written in English. User-facing UI copy remains Japanese unless the product language direction changes.
