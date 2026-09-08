@@ -11,7 +11,9 @@ for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: '次に必要な更新を、日付から確認する。' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /次に必要な更新を、\s*日付から確認する。/ }),
+    ).toBeVisible();
     await expect(page.getByText('Mock data')).toBeVisible();
     await expect(page.getByRole('heading', { name: '資格一覧' })).toBeVisible();
 
