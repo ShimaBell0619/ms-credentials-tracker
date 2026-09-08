@@ -2,10 +2,12 @@ import type { TranscriptCredentialCandidate } from '../domain/transcript-import.
 
 export const CREDENTIAL_STORAGE_KEY = 'ms-credentials-tracker:credentials:v1';
 
+export type CredentialImportSource = 'learnTranscriptPaste' | 'learnTranscriptShareUrl';
+
 export interface StoredCredential {
   id: string;
   credentialDefinitionId: string;
-  source: 'learnTranscriptPaste';
+  source: CredentialImportSource;
   sourceRecordId: string | null;
   sourceTitle: string;
   firstEarnedOn: string;
@@ -24,6 +26,10 @@ export interface SaveCredentialResult {
   skippedCount: number;
 }
 
+function isSupportedSource(value: unknown): value is CredentialImportSource {
+  return value === 'learnTranscriptPaste' || value === 'learnTranscriptShareUrl';
+}
+
 export function loadStoredCredentials(storage: Storage = window.localStorage): StoredCredential[] {
   const raw = storage.getItem(CREDENTIAL_STORAGE_KEY);
   if (!raw) return [];
@@ -35,7 +41,7 @@ export function loadStoredCredentials(storage: Storage = window.localStorage): S
       (credential): credential is StoredCredential =>
         typeof credential?.id === 'string' &&
         typeof credential?.credentialDefinitionId === 'string' &&
-        credential.source === 'learnTranscriptPaste' &&
+        isSupportedSource(credential?.source) &&
         typeof credential?.sourceTitle === 'string' &&
         typeof credential?.firstEarnedOn === 'string' &&
         typeof credential?.confirmedAt === 'string',
@@ -52,6 +58,7 @@ function candidateIdentity(candidate: TranscriptCredentialCandidate): string {
 
 export function saveConfirmedCredentialCandidates(
   candidates: TranscriptCredentialCandidate[],
+  source: CredentialImportSource = 'learnTranscriptShareUrl',
   storage: Storage = window.localStorage,
   now: Date = new Date(),
 ): SaveCredentialResult {
@@ -76,7 +83,7 @@ export function saveConfirmedCredentialCandidates(
     additions.push({
       id,
       credentialDefinitionId: candidate.matchedDefinitionId,
-      source: 'learnTranscriptPaste',
+      source,
       sourceRecordId: candidate.externalNumber,
       sourceTitle: candidate.detectedTitle,
       firstEarnedOn: candidate.earnedOn,

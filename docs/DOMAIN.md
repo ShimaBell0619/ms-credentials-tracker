@@ -89,19 +89,23 @@ This is a product-scope decision for the MVP, not a permanent architecture endor
 
 ## Microsoft Learn Transcript import
 
-The first assisted-input path is copied Microsoft Learn Transcript text.
+The primary assisted-input path is the official Microsoft Learn Transcript share URL.
 
 Pipeline:
 
-1. user pastes Transcript text
-2. parser extracts supported external records
-3. records are normalized into `ImportCandidate` values
-4. candidates are matched against the local `CredentialDefinition` catalog
-5. unresolved candidates remain unresolved; the application must not invent a credential identity
-6. user explicitly reviews and confirms candidates
-7. only confirmed, matched records become application data
+1. user pastes a Transcript share URL
+2. application validates that it is an HTTPS `learn.microsoft.com` Transcript share URL
+3. browser attempts to retrieve the public shared Transcript without credentials
+4. returned HTML is reduced to text and passed to the Transcript parser
+5. parser extracts supported external records and normalizes them into `ImportCandidate` values
+6. candidates are matched against the local `CredentialDefinition` catalog
+7. unresolved candidates remain unresolved; the application must not invent a credential identity
+8. user explicitly reviews and confirms candidates
+9. only confirmed, matched records become application data
 
-The copied Transcript text layout is not treated as a Microsoft API contract. Parsing must therefore be tolerant and conservative.
+The share URL itself is transport input and is not persisted as application credential data.
+
+The shared Transcript page and copied-text layout are not treated as Microsoft API contracts. Parsing must therefore remain tolerant and conservative. The direct browser fetch is explicitly a feasibility step: if Microsoft Learn blocks cross-origin retrieval, a trusted stateless fetch endpoint may replace only the transport step without changing candidate normalization, confirmation, or browser-local storage. Third-party CORS proxy services are not an acceptable production path.
 
 PDF import and manual-entry UX are follow-up input paths. A future Microsoft API or synchronization path must enter through the same reconciliation boundary rather than bypassing user-owned application state.
 

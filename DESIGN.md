@@ -66,7 +66,7 @@ Credential import is a supporting workflow, not a new dashboard section. Entry t
 - Credential table: compare credential, earned date, status, and expiry/next action.
 - Calendar: locate current sample-month events. Static mock UI must label the reference date as a sample/reference date rather than "today".
 - Upcoming list: concrete near-term events in chronological order.
-- Transcript import dialog: paste external text, parse into candidates, show matched/unresolved state in text, and require explicit confirmation before browser-local save.
+- Transcript import dialog: accept an official Microsoft Learn Transcript share URL, retrieve and parse external content into candidates when browser policy allows, show matched/unresolved state in text, and require explicit confirmation before browser-local save.
 
 ## Do
 

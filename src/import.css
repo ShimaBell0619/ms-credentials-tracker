@@ -90,10 +90,9 @@
   font-weight: 700;
 }
 
-.transcript-field textarea {
+.transcript-field input {
   width: 100%;
-  resize: vertical;
-  min-height: 170px;
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--line-strong);
   background: #fff;
@@ -101,7 +100,7 @@
   font: 12px/1.55 Consolas, "SFMono-Regular", monospace;
 }
 
-.transcript-field textarea:focus-visible {
+.transcript-field input:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -137,6 +136,16 @@
 .primary-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.load-error {
+  margin: -10px 28px 24px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .import-results {
@@ -303,7 +312,8 @@
 
   .import-description,
   .transcript-field,
-  .import-actions {
+  .import-actions,
+  .load-error {
     margin-inline: 20px;
   }
 
@@ -347,7 +357,8 @@
 
   .import-description,
   .transcript-field,
-  .import-actions {
+  .import-actions,
+  .load-error {
     margin-inline: 14px;
   }
 

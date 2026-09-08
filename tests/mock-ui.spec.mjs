@@ -40,7 +40,31 @@ test('keyboard focus is visible on the skip link', async ({ page }) => {
   await expect(skipLink).toBeVisible();
 });
 
-test('transcript paste import requires confirmation and persists matched credentials locally', async ({ page }) => {
+test('transcript share URL import requires confirmation and persists matched credentials locally', async ({ page }) => {
+  let requestedUrl = null;
+  await page.route('https://learn.microsoft.com/**', async (route) => {
+    requestedUrl = route.request().url();
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: `<!doctype html><html><body>
+        <main>
+          <h1>Transcript</h1>
+          <section>
+            Active certifications
+            Certification title Certification number Earned on Expires on
+            Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027
+          </section>
+          <section>
+            Passed exams
+            Exam title Exam number Passed date
+            Microsoft Azure Administrator AZ-104 Mar 14, 2026
+          </section>
+        </main>
+      </body></html>`,
+    });
+  });
+
   await page.goto('/');
   await page.getByRole('button', { name: '資格を取り込む' }).click();
 
@@ -48,20 +72,13 @@ test('transcript paste import requires confirmation and persists matched credent
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: '資格情報を取り込む' })).toBeVisible();
 
-  const transcript = `
-    Active certifications
-    Certification title Certification number Earned on Expires on
-    Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027
-
-    Passed exams
-    Exam title Exam number Passed date
-    Microsoft Azure Administrator AZ-104 Mar 14, 2026
-  `;
-
-  await dialog.getByLabel('Transcript テキスト').fill(transcript);
-  await dialog.getByRole('button', { name: '解析する' }).click();
+  await dialog.getByLabel('Transcript 共有URL').fill(
+    'https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken?utm_source=test',
+  );
+  await dialog.getByRole('button', { name: '共有URLから読み込む' }).click();
 
   await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+  expect(requestedUrl).toBe('https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken');
   await expect(dialog.locator('.candidate-title strong')).toHaveText(
     'Microsoft Certified: Azure Administrator Associate',
   );
@@ -79,4 +96,21 @@ test('transcript paste import requires confirmation and persists matched credent
 
   await page.reload();
   await expect(page.locator('.saved-count')).toContainText('1');
+});
+
+test('transcript share URL import reports browser fetch restrictions', async ({ page }) => {
+  await page.route('https://learn.microsoft.com/**', async (route) => {
+    await route.abort('failed');
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: '資格を取り込む' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Transcript 共有URL').fill(
+    'https://learn.microsoft.com/users/example/transcript/exampletoken',
+  );
+  await dialog.getByRole('button', { name: '共有URLから読み込む' }).click();
+
+  await expect(dialog.getByRole('alert')).toContainText('CORS');
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toHaveCount(0);
 });

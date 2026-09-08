@@ -3,18 +3,27 @@ import {
   parseMicrosoftLearnTranscript,
   type TranscriptParseResult,
 } from '../domain/transcript-import.ts';
+import { normalizeMicrosoftLearnTranscriptShareUrl } from '../domain/transcript-share-url.ts';
 import {
   loadStoredCredentials,
   saveConfirmedCredentialCandidates,
 } from '../storage/local-credential-store.ts';
 import '../import.css';
 
+function transcriptHtmlToText(html: string): string {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  for (const node of document.querySelectorAll('script, style, noscript')) node.remove();
+  return document.body?.textContent ?? '';
+}
+
 export function TranscriptImport() {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [text, setText] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
   const [result, setResult] = useState<TranscriptParseResult | null>(null);
   const [savedCount, setSavedCount] = useState(() => loadStoredCredentials().length);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const matchedCount =
     result?.credentials.filter(
@@ -24,17 +33,49 @@ export function TranscriptImport() {
 
   function openDialog() {
     setMessage(null);
+    setLoadError(null);
     dialogRef.current?.showModal();
   }
 
-  function parseTranscript() {
+  async function loadFromShareUrl() {
     setMessage(null);
-    setResult(parseMicrosoftLearnTranscript(text));
+    setLoadError(null);
+    setResult(null);
+
+    const normalized = normalizeMicrosoftLearnTranscriptShareUrl(shareUrl);
+    if (!normalized.ok) {
+      setLoadError('Microsoft Learn の Transcript 共有URLを入力してください。');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(normalized.url, {
+        method: 'GET',
+        credentials: 'omit',
+        redirect: 'follow',
+      });
+      if (!response.ok) {
+        setLoadError(`Microsoft Learn から取得できませんでした（HTTP ${response.status}）。`);
+        return;
+      }
+
+      const html = await response.text();
+      const transcriptText = transcriptHtmlToText(html);
+      const parsed = parseMicrosoftLearnTranscript(transcriptText);
+      setResult(parsed);
+    } catch {
+      setLoadError(
+        'このブラウザから Microsoft Learn の Transcript を直接取得できませんでした。外部サイトの取得制限（CORS）の可能性があります。',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function confirmImport() {
     if (!result) return;
-    const saved = saveConfirmedCredentialCandidates(result.credentials);
+    const saved = saveConfirmedCredentialCandidates(result.credentials, 'learnTranscriptShareUrl');
     setSavedCount(saved.credentials.length);
     setMessage(
       saved.addedCount > 0
@@ -70,25 +111,34 @@ export function TranscriptImport() {
         </div>
 
         <p className="import-description">
-          Microsoft Learn の Transcript をコピーして貼り付けます。解析結果は確認するまで保存されません。
+          Microsoft Learn の Transcript 共有URLを貼り付けます。取得した内容は確認するまで保存されません。
         </p>
 
         <label className="transcript-field">
-          <span>Transcript テキスト</span>
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.currentTarget.value)}
-            placeholder="Transcript の内容をここに貼り付け"
-            rows={8}
+          <span>Transcript 共有URL</span>
+          <input
+            type="url"
+            value={shareUrl}
+            onChange={(event) => setShareUrl(event.currentTarget.value)}
+            placeholder="https://learn.microsoft.com/.../users/.../transcript/..."
+            autoComplete="off"
+            spellCheck={false}
           />
         </label>
 
         <div className="import-actions">
-          <button className="primary-action" type="button" onClick={parseTranscript} disabled={!text.trim()}>
-            解析する
+          <button
+            className="primary-action"
+            type="button"
+            onClick={loadFromShareUrl}
+            disabled={!shareUrl.trim() || isLoading}
+          >
+            {isLoading ? '取得中…' : '共有URLから読み込む'}
           </button>
-          <span>この操作だけでは保存されません</span>
+          <span>共有URL自体は保存しません</span>
         </div>
+
+        {loadError ? <p className="load-error" role="alert">{loadError}</p> : null}
 
         {result ? (
           <section className="import-results" aria-labelledby="import-results-title">

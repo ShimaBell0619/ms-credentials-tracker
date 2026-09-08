@@ -1,11 +1,40 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizeTranscriptDate, parseMicrosoftLearnTranscript } from '../src/domain/transcript-import.ts';
+import { normalizeMicrosoftLearnTranscriptShareUrl } from '../src/domain/transcript-share-url.ts';
 
 test('normalizes Microsoft Learn transcript date formats', () => {
   assert.equal(normalizeTranscriptDate('Mar 14, 2026'), '2026-03-14');
   assert.equal(normalizeTranscriptDate('31 Oct 2025'), '2025-10-31');
   assert.equal(normalizeTranscriptDate('N/A'), null);
+});
+
+test('normalizes supported Microsoft Learn transcript share URLs', () => {
+  assert.deepEqual(
+    normalizeMicrosoftLearnTranscriptShareUrl(
+      ' https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken?utm_source=test#fragment ',
+    ),
+    {
+      ok: true,
+      url: 'https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken',
+    },
+  );
+  assert.deepEqual(
+    normalizeMicrosoftLearnTranscriptShareUrl(
+      'https://learn.microsoft.com/users/example-user/transcript/exampletoken',
+    ),
+    {
+      ok: true,
+      url: 'https://learn.microsoft.com/users/example-user/transcript/exampletoken',
+    },
+  );
+});
+
+test('rejects non-Microsoft and malformed transcript URLs', () => {
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://example.com/users/1/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('http://learn.microsoft.com/users/1/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com/users/1/profile').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('not a url').ok, false);
 });
 
 test('parses certification, exam, and Applied Skills records from copied transcript text', () => {
