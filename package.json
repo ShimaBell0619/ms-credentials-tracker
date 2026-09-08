@@ -10,7 +10,8 @@
     "test": "node --test tests/transcript-import.test.ts tests/credential-projection.test.ts tests/credential-maintenance.test.ts tests/google-calendar-sync.test.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "test:e2e": "playwright install --with-deps chromium && playwright test"
+    "test:e2e": "playwright install --with-deps chromium && playwright test",
+    "docs:gif": "node scripts/capture-readme-gif.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289",
