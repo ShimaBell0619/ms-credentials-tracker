@@ -51,10 +51,10 @@ Derive values from facts and policy:
 - current status
 - renewal opening date
 - days until expiry
-- next required action
+- next required action / deadline
 - schedule events generated from domain state
 
-Do not copy the current mock fields such as `status` or `renewalNote` into persisted application state.
+Do not persist UI fields such as status text, remaining-day labels, or renewal copy.
 
 ## Validity and renewal policy
 
@@ -65,7 +65,7 @@ The initial model supports:
 - `nonExpiring`
 - `expiring` with an explicit validity period and renewal window
 
-`UserCredential.currentExpiresOn` remains a confirmed fact rather than being regenerated solely from an earned date.
+`UserCredential.currentExpiresOn` remains a confirmed fact rather than being regenerated solely from an earned date. The live projection uses that confirmed expiry fact directly and uses the definition's renewal-window policy only to derive when renewal becomes available.
 
 ## Lifecycle and deletion
 
@@ -85,7 +85,7 @@ Authentication, multi-user ownership, server-side persistence, and organization/
 
 Confirmed credential records are stored in a versioned local-storage envelope.
 
-This is a product-scope decision for the MVP, not a permanent architecture endorsement of Local Storage. Domain parsing and normalization must remain independent from the storage implementation.
+This is a product-scope decision for the MVP, not a permanent architecture endorsement of Local Storage. Domain parsing, normalization, and projection logic must remain independent from the storage implementation.
 
 ## Microsoft Learn Transcript import
 
@@ -101,6 +101,7 @@ Pipeline:
 6. unresolved candidates remain unresolved; the application must not invent a credential identity
 7. user explicitly reviews and confirms candidates
 8. only confirmed, matched records become application data
+9. pure projections derive the date-led UI from confirmed facts and credential policy
 
 The selected PDF file itself is transport/input material and is not persisted. Only confirmed normalized credential facts are written to the versioned browser-local store.
 
@@ -110,15 +111,25 @@ The shared-URL route was empirically rejected for the MVP: browser fetch is bloc
 
 Manual-entry UX and any future Microsoft synchronization path are separate follow-ups. A future API/synchronization path must enter through the same reconciliation boundary rather than bypassing user-owned application state.
 
-## Current UI boundary
+## Current UI projection boundary
 
-The PR #5 date-led UI remains the product baseline.
+The PR #5 date-led visual hierarchy remains the product baseline, but its primary credential and schedule data are now produced from confirmed browser-local credentials rather than static mock records.
 
-During the first import slice, browser-local imported records are intentionally not allowed to drive the existing next-action, 90-day schedule, credential register, calendar, or upcoming-event mock data until the required date/status projection logic is implemented and tested. This prevents partially implemented domain behavior from being presented as live credential state.
+A single tested projection boundary drives:
+
+- derived credential status
+- renewal opening date
+- days until expiry
+- next future credential deadline
+- 90-day renewal/deadline events
+- current-month calendar markers
+- upcoming credential events
+
+When no confirmed credentials exist, the UI presents an onboarding/empty state. Planned exams and persisted history are intentionally excluded until their domain/persistence flows are implemented; they must later join the same schedule aggregation boundary rather than reintroducing parallel mock data.
 
 ## Testing contract
 
-Independent domain logic requires unit tests. The previous UI-only unit-test opt-out is no longer valid once Transcript parsing and normalization are introduced.
+Independent domain logic requires unit tests.
 
 Required gates are:
 
@@ -127,3 +138,5 @@ Required gates are:
 - `test`
 - `build`
 - browser-rendered E2E
+
+Date projection tests must use deterministic reference dates and cover renewal/expiry boundaries.
