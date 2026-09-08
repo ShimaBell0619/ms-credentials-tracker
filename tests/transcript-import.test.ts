@@ -1,43 +1,46 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeTranscriptDate, parseMicrosoftLearnTranscript } from '../src/domain/transcript-import.ts';
-import { normalizeMicrosoftLearnTranscriptShareUrl } from '../src/domain/transcript-share-url.ts';
+import {
+  normalizeTranscriptDate,
+  parseMicrosoftLearnTranscript,
+} from '../src/domain/transcript-import.ts';
+import {
+  MAX_TRANSCRIPT_PDF_BYTES,
+  validateTranscriptPdfFile,
+} from '../src/domain/transcript-pdf.ts';
 
-test('normalizes Microsoft Learn transcript date formats', () => {
+test('normalizes Microsoft Learn transcript date formats including Japanese dates', () => {
   assert.equal(normalizeTranscriptDate('Mar 14, 2026'), '2026-03-14');
   assert.equal(normalizeTranscriptDate('31 Oct 2025'), '2025-10-31');
+  assert.equal(normalizeTranscriptDate('2025 年 11 月 17 日'), '2025-11-17');
   assert.equal(normalizeTranscriptDate('N/A'), null);
+  assert.equal(normalizeTranscriptDate('該当なし'), null);
 });
 
-test('normalizes supported Microsoft Learn transcript share URLs', () => {
+test('validates Transcript PDF file metadata conservatively', () => {
   assert.deepEqual(
-    normalizeMicrosoftLearnTranscriptShareUrl(
-      ' https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken?utm_source=test#fragment ',
-    ),
-    {
-      ok: true,
-      url: 'https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken',
-    },
+    validateTranscriptPdfFile({ name: 'transcript.pdf', type: 'application/pdf', size: 1024 }),
+    { ok: true },
   );
   assert.deepEqual(
-    normalizeMicrosoftLearnTranscriptShareUrl(
-      'https://learn.microsoft.com/users/example-user/transcript/exampletoken',
-    ),
-    {
-      ok: true,
-      url: 'https://learn.microsoft.com/users/example-user/transcript/exampletoken',
-    },
+    validateTranscriptPdfFile({ name: 'transcript.PDF', type: '', size: 1024 }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    validateTranscriptPdfFile({ name: 'transcript.txt', type: 'text/plain', size: 1024 }),
+    { ok: false, error: 'notPdf' },
+  );
+  assert.deepEqual(
+    validateTranscriptPdfFile({
+      name: 'transcript.pdf',
+      type: 'application/pdf',
+      size: MAX_TRANSCRIPT_PDF_BYTES + 1,
+    }),
+    { ok: false, error: 'tooLarge' },
   );
 });
 
-test('rejects non-Microsoft and malformed transcript URLs', () => {
-  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://example.com/users/1/transcript/a').ok, false);
-  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('http://learn.microsoft.com/users/1/transcript/a').ok, false);
-  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com/users/1/profile').ok, false);
-  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('not a url').ok, false);
-});
-
-test('parses certification, exam, and Applied Skills records from copied transcript text', () => {
+test('parses certification, exam, and Applied Skills records from transcript text', () => {
   const transcript = `
     Applied Skills
     Applied Skills Title
@@ -70,7 +73,10 @@ test('parses certification, exam, and Applied Skills records from copied transcr
   });
 
   const appliedSkill = result.credentials.find((item) => item.kind === 'appliedSkill');
-  assert.equal(appliedSkill?.matchedDefinitionId, 'applied-skill.secure-azure-workloads-networking');
+  assert.equal(
+    appliedSkill?.matchedDefinitionId,
+    'applied-skill.secure-azure-workloads-networking',
+  );
   assert.equal(appliedSkill?.expiresOn, null);
 
   assert.deepEqual(result.exams[0], {
@@ -78,6 +84,29 @@ test('parses certification, exam, and Applied Skills records from copied transcr
     examNumber: 'AZ-104',
     passedOn: '2026-03-14',
   });
+});
+
+test('parses localized date labels and tolerates PDF column text around a known title', () => {
+  const transcript = `
+    有効な認定資格
+    認定資格タイトル 資格証明番号 取得日 有効期限
+    Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2
+    取得日: 2025 年 11 月 17 日 有効期限: 2026 年 11 月 18 日
+
+    合格した試験
+    試験タイトル 試験番号 合格日
+    Microsoft Azure Administrator AZ-104 2025 年 11 月 17 日
+  `;
+
+  const result = parseMicrosoftLearnTranscript(transcript);
+  assert.equal(result.credentials.length, 1);
+  assert.equal(result.credentials[0].detectedTitle, 'Microsoft Certified: Azure Administrator Associate');
+  assert.equal(result.credentials[0].earnedOn, '2025-11-17');
+  assert.equal(result.credentials[0].expiresOn, '2026-11-18');
+  assert.equal(result.credentials[0].matchStatus, 'matched');
+  assert.equal(result.exams.length, 1);
+  assert.equal(result.exams[0].examNumber, 'AZ-104');
+  assert.equal(result.exams[0].passedOn, '2025-11-17');
 });
 
 test('keeps unknown credentials unresolved instead of inventing a definition', () => {
