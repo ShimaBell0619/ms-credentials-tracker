@@ -43,6 +43,14 @@ The approved credential-domain and MVP data-boundary decisions are recorded in `
 - Unknown imported credentials remain unresolved until explicitly mapped; do not invent identities from names or exam codes.
 - Unit tests are required for independently testable domain logic.
 
+## Transcript PDF import
+
+- The approved MVP assisted-input path is a Microsoft Learn Transcript PDF saved by the user.
+- Parse the selected PDF locally in the browser; do not upload the PDF to a backend in this milestone.
+- Keep PDF extraction separate from Transcript normalization and catalog reconciliation.
+- Treat PDF layout as external input rather than an API contract; parsing must be conservative and tested against representative layouts.
+- Do not add OCR, browser automation, shared-page scraping, or undocumented Microsoft Learn endpoints without a new explicit decision.
+
 ## MVP persistence
 
 - The current approved MVP source of truth is versioned browser-local storage after explicit user confirmation.
