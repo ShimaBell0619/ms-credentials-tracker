@@ -62,9 +62,11 @@ test('transcript paste import requires confirmation and persists matched credent
   await dialog.getByRole('button', { name: '解析する' }).click();
 
   await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
-  await expect(dialog.getByText('Microsoft Certified: Azure Administrator Associate')).toBeVisible();
-  await expect(dialog.getByText('照合済み').last()).toBeVisible();
-  await expect(dialog.getByText('AZ-104')).toBeVisible();
+  await expect(dialog.locator('.candidate-title strong')).toHaveText(
+    'Microsoft Certified: Azure Administrator Associate',
+  );
+  await expect(dialog.locator('.candidate-list dd').filter({ hasText: '照合済み' })).toBeVisible();
+  await expect(dialog.locator('.exam-results strong')).toHaveText('AZ-104');
 
   const beforeConfirm = await page.evaluate(() =>
     window.localStorage.getItem('ms-credentials-tracker:credentials:v1'),
