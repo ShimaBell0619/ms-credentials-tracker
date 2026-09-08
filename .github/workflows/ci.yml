@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
+    with:
+      node_version_file: .node-version
+      cache_dependency_path: package-lock.json
+      run_test: false
+      test_opt_out_reason: UI-only mock with no independent domain logic in Issue 4; rendered E2E remains enabled.
+      run_e2e: true
+
+  pages-candidate:
+    name: Build Pages candidate
+    needs: verify
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
+    with:
+      node_version_file: .node-version
+      cache_dependency_path: package-lock.json
+      build_command: 'npm run build -- --base="$PAGES_BASE_PATH"'
+      output_directory: dist
+      enable_review_images: true
