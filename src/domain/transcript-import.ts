@@ -1,4 +1,4 @@
-import { matchCredentialDefinition } from './credential-catalog.ts';
+import { credentialDefinitions, matchCredentialDefinition } from './credential-catalog.ts';
 
 export type ImportMatchStatus = 'matched' | 'unresolved';
 
@@ -53,20 +53,47 @@ const MONTHS: Record<string, number> = {
 
 const MONTH_SOURCE =
   '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
-const DATE_SOURCE = `(?:${MONTH_SOURCE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${MONTH_SOURCE}\\s+\\d{4}|\\d{4}-\\d{2}-\\d{2})`;
+const JAPANESE_DATE_SOURCE = '\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日';
+const DATE_SOURCE = `(?:${MONTH_SOURCE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${MONTH_SOURCE}\\s+\\d{4}|\\d{4}-\\d{2}-\\d{2}|${JAPANESE_DATE_SOURCE})`;
+const NO_DATE_SOURCE = '(?:N\\/?A|該当なし|なし)';
 const EXTERNAL_NUMBER_SOURCE = '(?:[A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+|[A-Z0-9]{12,})';
+const EARNED_LABEL_SOURCE = '(?:(?:Earned on|取得日|取得日付)\\s*[:：]?\\s*)?';
+const EXPIRES_LABEL_SOURCE = '(?:(?:Expires on|有効期限|有効期限日)\\s*[:：]?\\s*)?';
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeTitleForCompare(value: string): string {
+  return normalizeWhitespace(value).normalize('NFKC').toLocaleLowerCase('en-US');
+}
+
+function canonicalTitleInside(
+  kind: TranscriptCredentialCandidate['kind'],
+  detectedTitle: string,
+): string | null {
+  const normalized = normalizeTitleForCompare(detectedTitle);
+  return (
+    credentialDefinitions.find(
+      (definition) =>
+        definition.kind === kind &&
+        normalized.includes(normalizeTitleForCompare(definition.canonicalTitle)),
+    )?.canonicalTitle ?? null
+  );
+}
+
 export function normalizeTranscriptDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const normalized = normalizeWhitespace(value).replace(/,$/, '');
-  if (/^N\/?A$/i.test(normalized)) return null;
+  if (/^(?:N\/?A|該当なし|なし)$/i.test(normalized)) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
 
-  let match = normalized.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+  let match = normalized.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日$/);
+  if (match) {
+    return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}-${String(Number(match[3])).padStart(2, '0')}`;
+  }
+
+  match = normalized.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
   if (match) {
     const month = MONTHS[match[1].toLowerCase()];
     if (!month) return null;
@@ -90,7 +117,8 @@ function buildCredentialCandidate(
   earnedOn: string | null,
   expiresOn: string | null,
 ): TranscriptCredentialCandidate {
-  const title = normalizeWhitespace(detectedTitle);
+  const rawTitle = normalizeWhitespace(detectedTitle);
+  const title = canonicalTitleInside(kind, rawTitle) ?? rawTitle;
   const definition = matchCredentialDefinition(title);
   return {
     kind,
@@ -105,7 +133,7 @@ function buildCredentialCandidate(
 
 function parseCertifications(compactText: string): TranscriptCredentialCandidate[] {
   const pattern = new RegExp(
-    `(Microsoft Certified:\\s+.+?)\\s+(${EXTERNAL_NUMBER_SOURCE})\\s+(?:Earned on\\s*:?\\s*)?(${DATE_SOURCE})\\s+(?:Expires on\\s*:?\\s*)?(N\\/?A|${DATE_SOURCE})`,
+    `(Microsoft Certified:\\s+.+?)\\s+(${EXTERNAL_NUMBER_SOURCE})\\s+${EARNED_LABEL_SOURCE}(${DATE_SOURCE})\\s+${EXPIRES_LABEL_SOURCE}(${NO_DATE_SOURCE}|${DATE_SOURCE})`,
     'gi',
   );
 
@@ -121,8 +149,10 @@ function parseCertifications(compactText: string): TranscriptCredentialCandidate
 }
 
 function parseAppliedSkills(compactText: string): TranscriptCredentialCandidate[] {
+  const credentialNumberLabel =
+    '(?:(?:Credential number|資格証明番号|資格情報番号|認定資格番号)\\s*[:：]?\\s*)?';
   const pattern = new RegExp(
-    `(Microsoft Applied Skills:\\s+.+?)\\s+(?:Credential number\\s*:?\\s*)?(${EXTERNAL_NUMBER_SOURCE})\\s+(?:Earned on\\s*:?\\s*)?(${DATE_SOURCE})`,
+    `(Microsoft Applied Skills:\\s+.+?)\\s+${credentialNumberLabel}(${EXTERNAL_NUMBER_SOURCE})\\s+${EARNED_LABEL_SOURCE}(${DATE_SOURCE})`,
     'gi',
   );
 
@@ -138,12 +168,12 @@ function parseAppliedSkills(compactText: string): TranscriptCredentialCandidate[
 }
 
 function getPassedExamSection(compactText: string): string {
-  const startMatch = /\bPassed exams\b/i.exec(compactText);
+  const startMatch = /\bPassed exams\b|合格した試験|合格済みの試験/i.exec(compactText);
   if (!startMatch) return '';
 
   const start = startMatch.index + startMatch[0].length;
   const remainder = compactText.slice(start);
-  const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b/i.exec(
+  const endMatch = /\b(?:Applied Skills|Active certifications|Historical certifications|Learning paths completed|Microsoft Certified Trainer History)\b|応用スキル|有効な認定資格|過去の認定資格|完了したラーニング パス/i.exec(
     remainder,
   );
   return endMatch ? remainder.slice(0, endMatch.index) : remainder;
@@ -152,7 +182,10 @@ function getPassedExamSection(compactText: string): string {
 function parseExams(compactText: string): TranscriptExamCandidate[] {
   let section = getPassedExamSection(compactText);
   if (!section) return [];
-  section = section.replace(/^\s*Exam title\s+Exam number\s+Passed date\s*/i, '');
+  section = section.replace(
+    /^\s*(?:Exam title\s+Exam number\s+Passed date|試験タイトル\s+試験番号\s+合格日)\s*/i,
+    '',
+  );
 
   const pattern = new RegExp(`(.+?)\\s+([A-Z]{1,5}-\\d{2,4})\\s+(${DATE_SOURCE})`, 'gi');
   return Array.from(section.matchAll(pattern), (match) => ({
