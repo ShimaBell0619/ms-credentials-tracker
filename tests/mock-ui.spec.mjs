@@ -136,6 +136,35 @@ test('derived status meaning is available as text', async ({ page }) => {
   await expect(page.getByText('AZ-104 有効期限').first()).toBeVisible();
 });
 
+test('90-day month scale uses calendar-day proportions and keeps deadline pins in the correct month', async ({ page }) => {
+  await freezeDate(page);
+  await page.addInitScript((data) => {
+    window.localStorage.setItem('ms-credentials-tracker:credentials:v1', JSON.stringify(data));
+  }, storedEnvelope());
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/');
+
+  const monthLabels = page.locator('.month-scale span');
+  const september = await monthLabels.filter({ hasText: '9月' }).boundingBox();
+  const october = await monthLabels.filter({ hasText: '10月' }).boundingBox();
+  const november = await monthLabels.filter({ hasText: '11月' }).boundingBox();
+  const december = await monthLabels.filter({ hasText: '12月' }).boundingBox();
+  const deadlinePin = await page.locator('.timeline-pin-deadline').first().boundingBox();
+
+  expect(september).not.toBeNull();
+  expect(october).not.toBeNull();
+  expect(november).not.toBeNull();
+  expect(december).not.toBeNull();
+  expect(deadlinePin).not.toBeNull();
+
+  expect(october.width).toBeGreaterThan(september.width);
+  expect(november.width).toBeGreaterThan(december.width);
+
+  const pinCenter = deadlinePin.x + deadlinePin.width / 2;
+  expect(pinCenter).toBeGreaterThanOrEqual(november.x);
+  expect(pinCenter).toBeLessThanOrEqual(november.x + november.width);
+});
+
 test('keyboard focus is visible on the skip link', async ({ page }) => {
   await freezeDate(page);
   await page.goto('/');

@@ -24,10 +24,6 @@
   line-height: 1.65;
 }
 
-.live-month-scale {
-  grid-template-columns: repeat(var(--month-count), minmax(0, 1fr));
-}
-
 .live-timeline-rail {
   background-image: none;
 }

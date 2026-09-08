@@ -71,25 +71,37 @@ function renewalNote(credential: CredentialProjection): string {
 
 function timelinePosition(referenceDate: string, date: string): string {
   const offset = Math.max(0, Math.min(89, differenceInCalendarDays(date, referenceDate)));
-  return `${(offset / 89) * 100}%`;
+  return `${((offset + 0.5) / 90) * 100}%`;
 }
 
-function monthSequence(start: string, end: string): Array<{ id: string; label: string }> {
+interface TimelineMonth {
+  id: string;
+  label: string;
+  days: number;
+}
+
+function monthSequence(start: string, end: string): TimelineMonth[] {
   const startDate = parseIsoDate(start);
   const endDate = parseIsoDate(end);
-  const months: Array<{ id: string; label: string }> = [];
-  let year = startDate.getUTCFullYear();
-  let month = startDate.getUTCMonth();
-  const endIndex = endDate.getUTCFullYear() * 12 + endDate.getUTCMonth();
+  const endExclusive = new Date(endDate.getTime() + 24 * 60 * 60 * 1000);
+  const months: TimelineMonth[] = [];
+  let cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
 
-  while (year * 12 + month <= endIndex) {
-    months.push({ id: `${year}-${month + 1}`, label: `${month + 1}月` });
-    month += 1;
-    if (month === 12) {
-      month = 0;
-      year += 1;
-    }
+  while (cursor <= endDate) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth();
+    const nextMonth = new Date(Date.UTC(year, month + 1, 1));
+    const segmentStart = cursor < startDate ? startDate : cursor;
+    const segmentEnd = nextMonth < endExclusive ? nextMonth : endExclusive;
+    const days = Math.max(
+      1,
+      Math.round((segmentEnd.getTime() - segmentStart.getTime()) / (24 * 60 * 60 * 1000)),
+    );
+
+    months.push({ id: `${year}-${month + 1}`, label: `${month + 1}月`, days });
+    cursor = nextMonth;
   }
+
   return months;
 }
 
@@ -277,7 +289,9 @@ export default function App() {
           <div className="timeline-visual" aria-hidden="true">
             <div
               className="month-scale live-month-scale"
-              style={{ '--month-count': months.length } as CSSProperties}
+              style={{
+      gridTemplateColumns: months.map((month) => `minmax(0, ${month.days}fr)`).join(' '),
+    }}
             >
               {months.map((month) => <span key={month.id}>{month.label}</span>)}
             </div>
