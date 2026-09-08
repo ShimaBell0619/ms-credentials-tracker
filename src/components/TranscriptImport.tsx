@@ -238,17 +238,26 @@ export function TranscriptImport() {
                 <p className="load-error" role="status">
                   {describeTranscriptDiagnostic(diagnostics)}
                 </p>
-                <details className="exam-results">
+                <details className="exam-results" open>
                   <summary>診断情報（個人データは表示しません）</summary>
                   <ul>
                     <li><strong>HTML</strong><span>{diagnostics.htmlLength}文字</span></li>
+                    <li><strong>本文相当</strong><span>{diagnostics.bodyTextLength}文字</span></li>
                     <li><strong>lang</strong><span>{diagnostics.documentLang ?? '不明'}</span></li>
+                    <li><strong>script</strong><span>{diagnostics.scriptCount}件（外部 {diagnostics.externalScriptCount} / inline {diagnostics.inlineScriptCount}）</span></li>
+                    <li><strong>iframe</strong><span>{diagnostics.iframeCount}件</span></li>
                     <li><strong>Certified</strong><span>{yesNo(diagnostics.containsMicrosoftCertified)}</span></li>
                     <li><strong>Applied Skills</strong><span>{yesNo(diagnostics.containsAppliedSkills)}</span></li>
                     <li><strong>Passed exams</strong><span>{yesNo(diagnostics.containsPassedExams)}</span></li>
                     <li><strong>Earned on</strong><span>{yesNo(diagnostics.containsEarnedOn)}</span></li>
                     <li><strong>日本語日付</strong><span>{yesNo(diagnostics.containsJapaneseDate)}</span></li>
+                    <li><strong>Transcript語</strong><span>{yesNo(diagnostics.containsTranscriptToken)}</span></li>
+                    <li><strong>Credential語</strong><span>{yesNo(diagnostics.containsCredentialToken)}</span></li>
+                    <li><strong>API hint</strong><span>{yesNo(diagnostics.containsApiHint)}</span></li>
+                    <li><strong>Client runtime</strong><span>{yesNo(diagnostics.containsClientRuntimeHint)}</span></li>
                     <li><strong>Hydration data</strong><span>{yesNo(diagnostics.containsHydrationData)}</span></li>
+                    <li><strong>Transcript iframe</strong><span>{yesNo(diagnostics.containsIframeTranscriptHint)}</span></li>
+                    <li><strong>404 / denied</strong><span>{yesNo(diagnostics.containsNotFoundOrDeniedMarker)}</span></li>
                   </ul>
                 </details>
               </>
