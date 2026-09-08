@@ -13,7 +13,9 @@ jobs:
     uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@5382fc2c0735ce82c54dd05c07cb369d4b3b536a
     with:
       node_version_file: .node-version
-      cache_dependency_path: package-lock.json
+      cache_dependency_path: |-
+        package-lock.json
+        api/package-lock.json
       run_test: true
       run_e2e: true
 
@@ -27,7 +29,9 @@ jobs:
     uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@5382fc2c0735ce82c54dd05c07cb369d4b3b536a
     with:
       node_version_file: .node-version
-      cache_dependency_path: package-lock.json
-      build_command: 'npm run build -- --base="$PAGES_BASE_PATH"'
+      cache_dependency_path: |-
+        package-lock.json
+        api/package-lock.json
+      build_command: 'VITE_TRANSCRIPT_API_URL="${{ vars.VITE_TRANSCRIPT_API_URL }}" npm run build -- --base="$PAGES_BASE_PATH"'
       output_directory: dist
       enable_review_images: true

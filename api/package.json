@@ -1,0 +1,23 @@
+{
+  "name": "ms-credentials-transcript-function",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/api/src/functions/*.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.ts",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "4.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "26.5.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

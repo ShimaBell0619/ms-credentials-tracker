@@ -33,6 +33,10 @@ test('normalizes supported Microsoft Learn transcript share URLs', () => {
 test('rejects non-Microsoft and malformed transcript URLs', () => {
   assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://example.com/users/1/transcript/a').ok, false);
   assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('http://learn.microsoft.com/users/1/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com:444/users/1/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://user:pass@learn.microsoft.com/users/1/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com/users/%2e%2e/transcript/a').ok, false);
+  assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com/users/1/transcript/%2fadmin').ok, false);
   assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('https://learn.microsoft.com/users/1/profile').ok, false);
   assert.equal(normalizeMicrosoftLearnTranscriptShareUrl('not a url').ok, false);
 });

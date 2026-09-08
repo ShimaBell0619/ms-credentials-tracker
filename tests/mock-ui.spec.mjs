@@ -42,12 +42,12 @@ test('keyboard focus is visible on the skip link', async ({ page }) => {
 
 test('transcript share URL import requires confirmation and persists matched credentials locally', async ({ page }) => {
   let requestedUrl = null;
-  await page.route('https://learn.microsoft.com/**', async (route) => {
-    requestedUrl = route.request().url();
+  await page.route('https://func.example.test/api/transcript', async (route) => {
+    requestedUrl = (await route.request().postDataJSON()).url;
     await route.fulfill({
       status: 200,
-      contentType: 'text/html; charset=utf-8',
-      body: `<!doctype html><html><body>
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ content: `<!doctype html><html><body>
         <main>
           <h1>Transcript</h1>
           <section>
@@ -61,7 +61,7 @@ test('transcript share URL import requires confirmation and persists matched cre
             Microsoft Azure Administrator AZ-104 Mar 14, 2026
           </section>
         </main>
-      </body></html>`,
+      </body></html>` }),
     });
   });
 
@@ -98,9 +98,9 @@ test('transcript share URL import requires confirmation and persists matched cre
   await expect(page.locator('.saved-count')).toContainText('1');
 });
 
-test('transcript share URL import reports browser fetch restrictions', async ({ page }) => {
-  await page.route('https://learn.microsoft.com/**', async (route) => {
-    await route.abort('failed');
+test('transcript share URL import reports API failures', async ({ page }) => {
+  await page.route('https://func.example.test/api/transcript', async (route) => {
+    await route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"upstreamFailure"}' });
   });
 
   await page.goto('/');
@@ -111,6 +111,6 @@ test('transcript share URL import reports browser fetch restrictions', async ({ 
   );
   await dialog.getByRole('button', { name: '共有URLから読み込む' }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('CORS');
+  await expect(dialog.getByRole('alert')).toContainText('HTTP 502');
   await expect(dialog.getByRole('heading', { name: '解析結果' })).toHaveCount(0);
 });

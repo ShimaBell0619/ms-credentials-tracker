@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "npm ci --prefix api --ignore-scripts",
     "dev": "vite",
     "check": "biome lint .",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test tests/transcript-import.test.ts",
+    "typecheck": "tsc --noEmit && npm run typecheck --prefix api",
+    "test": "node --test tests/*.test.ts api/tests/*.test.ts",
     "build": "vite build",
+    "build:function": "npm run build --prefix api",
     "postbuild": "node scripts/verify-pages-build.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright install --with-deps chromium && playwright test"

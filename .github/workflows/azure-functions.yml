@@ -1,0 +1,81 @@
+name: Azure Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - api/**
+      - infra/**
+      - src/domain/transcript-share-url.ts
+      - .github/workflows/azure-functions.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-functions-production
+  cancel-in-progress: false
+
+env:
+  AZURE_LOCATION: japaneast
+  AZURE_FUNCTIONAPP_NAME: func-mscred-transcript-prod-jpe-01
+
+jobs:
+  validate-what-if-deploy:
+    name: Validate, what-if, deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate infrastructure
+        run: >-
+          az deployment sub validate
+          --name mscred-${{ github.run_id }}
+          --location "$AZURE_LOCATION"
+          --template-file infra/main.bicep
+          --parameters infra/parameters/prod.bicepparam
+
+      - name: Preview infrastructure changes
+        run: >-
+          az deployment sub what-if
+          --name mscred-${{ github.run_id }}
+          --location "$AZURE_LOCATION"
+          --template-file infra/main.bicep
+          --parameters infra/parameters/prod.bicepparam
+          --no-pretty-print
+
+      - name: Deploy infrastructure
+        run: >-
+          az deployment sub create
+          --name mscred-${{ github.run_id }}
+          --location "$AZURE_LOCATION"
+          --template-file infra/main.bicep
+          --parameters infra/parameters/prod.bicepparam
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Build Function package
+        run: |
+          npm ci --prefix api
+          npm run build --prefix api
+          npm prune --omit=dev --prefix api
+
+      - name: Deploy Function package
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: api
+          remote-build: false

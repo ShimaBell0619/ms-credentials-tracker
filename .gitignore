@@ -1,5 +1,7 @@
 node_modules/
 dist/
+api/dist/
+api/local.settings.json
 playwright-report/
 test-results/
 .pages-review/

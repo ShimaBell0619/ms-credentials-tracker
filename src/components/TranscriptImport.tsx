@@ -8,7 +8,10 @@ import {
   loadStoredCredentials,
   saveConfirmedCredentialCandidates,
 } from '../storage/local-credential-store.ts';
+import { fetchTranscriptThroughApi } from '../transport/transcript-api.ts';
 import '../import.css';
+
+const transcriptApiUrl = import.meta.env.VITE_TRANSCRIPT_API_URL;
 
 function transcriptHtmlToText(html: string): string {
   const document = new DOMParser().parseFromString(html, 'text/html');
@@ -50,24 +53,23 @@ export function TranscriptImport() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(normalized.url, {
-        method: 'GET',
-        credentials: 'omit',
-        redirect: 'follow',
-      });
+      const response = await fetchTranscriptThroughApi(transcriptApiUrl, normalized.url);
       if (!response.ok) {
-        setLoadError(`Microsoft Learn から取得できませんでした（HTTP ${response.status}）。`);
+        if (response.error === 'notConfigured' || response.error === 'invalidEndpoint') {
+          setLoadError('Transcript 取得サービスが設定されていません。');
+        } else if (response.status) {
+          setLoadError(`Microsoft Learn から取得できませんでした（HTTP ${response.status}）。`);
+        } else {
+          setLoadError('Transcript 取得サービスへ接続できませんでした。時間をおいて再度お試しください。');
+        }
         return;
       }
 
-      const html = await response.text();
-      const transcriptText = transcriptHtmlToText(html);
+      const transcriptText = transcriptHtmlToText(response.html);
       const parsed = parseMicrosoftLearnTranscript(transcriptText);
       setResult(parsed);
     } catch {
-      setLoadError(
-        'このブラウザから Microsoft Learn の Transcript を直接取得できませんでした。外部サイトの取得制限（CORS）の可能性があります。',
-      );
+      setLoadError('Transcript 取得サービスで予期しないエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }

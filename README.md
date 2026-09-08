@@ -4,7 +4,7 @@ A UI-first web application for reviewing Microsoft certification status, renewal
 
 ## Current state
 
-The initial responsive UI baseline is implemented with static mock data. It is intentionally designed around the next required credential action rather than a generic KPI dashboard.
+The initial responsive UI baseline is implemented with static mock data. A Microsoft Learn Transcript share URL can be fetched through the dedicated Azure Function, parsed into import candidates, explicitly confirmed, and persisted in versioned browser-local storage.
 
 The next development phase should introduce domain logic incrementally, starting with the credential data model and application source-of-truth design before authentication, persistence, or Microsoft integrations.
 
@@ -15,18 +15,24 @@ npm ci
 npm run dev
 ```
 
+Copy `.env.example` to `.env.local` when testing the shared-Transcript flow against the deployed Function. The endpoint is injected at build time with `VITE_TRANSCRIPT_API_URL`; the share URL itself is sent in a POST body and is never stored by the application.
+
 Validation:
 
 ```bash
 npm run check
 npm run typecheck
+npm run test
+npm run build:function
 npm run build
 npm run test:e2e
 ```
 
+Azure infrastructure, OIDC bootstrap, deployment, and operational boundaries are documented in `docs/AZURE.md`.
+
 ## Current limitations
 
-All displayed credential information is static mock data. No Microsoft account, API, authentication, persistence, real renewal calculation, or notification integration is implemented yet.
+The main schedule and credential register remain static mock data. Imported records are browser-local and intentionally do not drive those projections yet. There is no Microsoft account authentication, database, automatic synchronization, real renewal calculation, or notification integration.
 
 ## Documentation language
 
