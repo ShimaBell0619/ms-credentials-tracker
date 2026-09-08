@@ -14,6 +14,7 @@
     "test:e2e": "playwright install --with-deps chromium && playwright test"
   },
   "dependencies": {
+    "pdfjs-dist": "6.3.289",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
