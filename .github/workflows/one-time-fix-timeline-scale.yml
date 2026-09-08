@@ -91,32 +91,23 @@ jobs:
               raise SystemExit('timeline helper block not found')
           text = text.replace(old, new, 1)
 
-          old = '''            <div
-              className="month-scale live-month-scale"
-              style={{ '--month-count': months.length } as CSSProperties}
-            >
-              {months.map((month) => <span key={month.id}>{month.label}</span>)}
-            </div>'''
-          new = '''            <div
-              className="month-scale live-month-scale"
-              style={{
+          old_style = "style={{ '--month-count': months.length } as CSSProperties}"
+          new_style = """style={{
                 gridTemplateColumns: months.map((month) => `minmax(0, ${month.days}fr)`).join(' '),
-              }}
-            >
-              {months.map((month) => <span key={month.id}>{month.label}</span>)}
-            </div>'''
-          if old not in text:
-              raise SystemExit('month scale render block not found')
-          text = text.replace(old, new, 1)
+              }}"""
+          if old_style not in text:
+              raise SystemExit('month scale style not found')
+          text = text.replace(old_style, new_style, 1)
           app.write_text(text)
 
           live = Path('src/live.css')
           css = live.read_text()
-          css = css.replace('''.live-month-scale {
+          old_css = '''.live-month-scale {
             grid-template-columns: repeat(var(--month-count), minmax(0, 1fr));
           }
 
-          ''', '', 1)
+          '''
+          css = css.replace(old_css, '', 1)
           live.write_text(css)
 
           test = Path('tests/mock-ui.spec.mjs')
