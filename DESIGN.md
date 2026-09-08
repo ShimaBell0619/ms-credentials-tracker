@@ -15,6 +15,8 @@ omitted: []
 
 第一視線は次の期限。第二視線は90日内の更新・期限・受験予定。資格総数などの集計値は主目的ではないため、均等なKPIカードは置かない。
 
+ページ先頭はコンセプトを説明するhero copyではなく、機能名「資格の更新予定」とサンプル基準日だけを静かに置く。日付中心の設計意図は説明文ではなく、直下の期限recordと時間軸そのもので伝える。
+
 ## Colors
 
 - Neutral paper: warm gray / off-white。予定表・台帳として長時間見ても騒がしくならない背景。
@@ -54,10 +56,11 @@ omitted: []
 ## Components
 
 - Header: product identity、mock表示、セクション内navigation。
+- Page introduction: 機能名とサンプル基準日だけを表示し、hero copyや説明文で設計意図を重複説明しない。
 - Next action: 日付・資格・残日数を一つの期限recordとして表示。
 - 90-day schedule: 時間軸とaccessibility向けevent list。
 - Credential table: 資格、取得日、状態、有効期限/次回を比較。
-- Calendar: 今月の予定位置を確認。
+- Calendar: 今月の予定位置を確認。静的モックでは「今日」ではなくサンプル基準日として表示する。
 - Upcoming list: 直近の具体的予定を時系列表示。
 
 ## Do's and Don'ts
@@ -78,3 +81,4 @@ omitted: []
 - 有効期間をtask progressのようなprogress barで表現しない。
 - statusをpill化して情報量以上の視覚重量を与えない。
 - Microsoft Learnの既存画面を模倣しない。
+- 日付中心の設計コンセプトをmarketing hero copyで説明しない。
