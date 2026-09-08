@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { GoogleCalendarSync } from './components/GoogleCalendarSync';
 import './styles.css';
 import './live.css';
 import './maintenance.css';
@@ -11,5 +12,6 @@ if (!root) throw new Error('Root element not found');
 createRoot(root).render(
   <StrictMode>
     <App />
+    <GoogleCalendarSync />
   </StrictMode>,
 );

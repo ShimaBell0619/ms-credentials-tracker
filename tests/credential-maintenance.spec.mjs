@@ -85,28 +85,41 @@ test('stale renewal-window data shows a re-import prompt and opens Transcript im
   expect(widths.content).toBeLessThanOrEqual(widths.viewport);
 });
 
-test('manual credential can be added, archived, and restored from the UI', async ({ page }) => {
+test('manual add, edit, archive, and restore controls are not exposed in the v0.3 UI', async ({ page }) => {
   await freezeDate(page);
   await page.setViewportSize({ width: 320, height: 800 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ms-credentials-tracker:credentials:v2',
+      JSON.stringify({
+        version: 2,
+        history: [],
+        credentials: [
+          {
+            id: 'learn:az104',
+            credentialDefinitionId: 'cert.azure-administrator-associate',
+            source: 'learnTranscriptPdf',
+            sourceRecordId: 'az104',
+            sourceTitle: 'Microsoft Certified: Azure Administrator Associate',
+            firstEarnedOn: '2025-01-01',
+            currentExpiresOn: '2027-01-01',
+            confirmedAt: '2026-09-08T00:00:00.000Z',
+            lastTranscriptConfirmedOn: '2026-09-08',
+            manualOverrideAt: null,
+            archivedAt: null,
+          },
+        ],
+      }),
+    );
+  });
   await page.goto('/');
 
-  await page.getByRole('button', { name: '手動追加' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: '資格を手動で追加' })).toBeVisible();
-  await dialog.getByLabel('資格').selectOption('cert.azure-administrator-associate');
-  await dialog.getByLabel('取得日').fill('2025-01-01');
-  await dialog.getByLabel('現在の有効期限').fill('2027-01-01');
-  await dialog.getByRole('button', { name: '資格を追加' }).click();
-
-  const row = page.locator('.credential-table tbody tr').filter({ hasText: 'AZ-104' });
-  await expect(row).toBeVisible();
-  await row.getByRole('button', { name: 'アーカイブ' }).click();
-  await expect(row).toHaveCount(0);
-  await expect(page.getByText('アーカイブ済み 1件')).toBeVisible();
-
-  await page.getByText('アーカイブ済み 1件').click();
-  await page.getByRole('button', { name: '元に戻す' }).click();
-  await expect(page.locator('.credential-table tbody tr').filter({ hasText: 'AZ-104' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '手動追加' })).toBeHidden();
+  await expect(page.getByRole('button', { name: '資格を追加' })).toBeHidden();
+  await expect(page.getByRole('button', { name: '修正' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'アーカイブ' })).toBeHidden();
+  await expect(page.getByText('アーカイブ済み')).toHaveCount(0);
 
   const widths = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,

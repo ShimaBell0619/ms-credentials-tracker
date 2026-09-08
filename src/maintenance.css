@@ -37,60 +37,36 @@
   color: var(--text-secondary, #5b5b5b);
 }
 
+/* Manual add/edit/archive remains in the persistence layer for compatibility,
+   but v0.3 intentionally exposes Transcript import as the only credential-entry UI. */
 .manual-trigger,
-.secondary-action,
-.credential-actions button,
-.archived-credentials button {
-  border: 1px solid var(--line-strong, #b8b8b8);
-  background: #fff;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+.register-heading > .secondary-action,
+.credential-table th:last-child,
+.credential-table td[data-label='操作'],
+.archived-credentials {
+  display: none !important;
 }
 
-.manual-trigger,
-.secondary-action {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 3px;
+.next-action-empty[aria-label='資格データ未登録'] p:last-child,
+.register-empty > span {
+  display: none;
+}
+
+.next-action-empty[aria-label='資格データ未登録'] > div::after {
+  content: 'Microsoft Learn の Transcript PDF を取り込んで資格情報を登録してください。';
+  display: block;
+  max-width: 620px;
+  margin-top: 10px;
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 650;
+  line-height: 1.65;
 }
 
-.manual-trigger:hover,
-.secondary-action:hover,
-.credential-actions button:hover,
-.archived-credentials button:hover {
-  background: #f5f5f5;
-}
-
-.manual-dialog form {
-  display: grid;
-  gap: 18px;
-}
-
-.manual-form-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.manual-form-grid select,
-.candidate-resolution select {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid var(--line-strong, #b8b8b8);
-  border-radius: 3px;
-  background: #fff;
-  padding: 8px 10px;
-  color: inherit;
-  font: inherit;
-}
-
-.manual-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 4px;
+.register-empty::after {
+  content: 'Transcript PDFを取り込んで資格情報を登録してください。';
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .candidate-resolution {
@@ -112,67 +88,6 @@
   color: var(--text-secondary, #666);
 }
 
-.credential-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.credential-actions button,
-.archived-credentials button {
-  min-height: 28px;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-}
-
-.archived-credentials {
-  margin-top: 16px;
-  border-top: 1px solid var(--line, #e2e2e2);
-  padding-top: 12px;
-}
-
-.archived-credentials summary {
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.archived-credentials ul {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.archived-credentials li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line, #ededed);
-}
-
-.archived-credentials li div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.archived-credentials li strong {
-  font-size: 11px;
-}
-
-.archived-credentials li span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-secondary, #666);
-}
-
 @media (max-width: 720px) {
   .freshness-banner {
     align-items: stretch;
@@ -187,29 +102,5 @@
 
   .header-meta {
     flex-wrap: wrap;
-  }
-
-  .manual-dialog-actions {
-    flex-direction: column-reverse;
-  }
-
-  .manual-dialog-actions button {
-    width: 100%;
-  }
-
-  .archived-credentials li {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 420px) {
-  .credential-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .credential-actions button {
-    width: 100%;
   }
 }

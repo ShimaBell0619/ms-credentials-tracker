@@ -29,6 +29,38 @@
   background-image: none;
 }
 
+/* The 90-day window starts today. Keep that anchor visible independently of event pins. */
+.live-timeline-rail::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 0.556%;
+  top: -8px;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--ink);
+}
+
+.live-timeline-rail::after {
+  content: '今日';
+  position: absolute;
+  z-index: 2;
+  left: 0.556%;
+  top: 13px;
+  transform: translateX(0);
+  padding: 3px 6px;
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 700 10px/1 Consolas, "SFMono-Regular", monospace;
+  white-space: nowrap;
+}
+
+.live-timeline-rail .timeline-pin {
+  z-index: 3;
+}
+
 .live-timeline-events {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
