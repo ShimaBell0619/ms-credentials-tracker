@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { credentialDefinitions } from '../domain/credential-catalog.ts';
 import {
   parseMicrosoftLearnTranscript,
+  type TranscriptCredentialCandidate,
   type TranscriptParseResult,
 } from '../domain/transcript-import.ts';
 import {
@@ -13,6 +15,8 @@ import {
   type TranscriptPdfReadError,
 } from '../transport/transcript-pdf.ts';
 import '../import.css';
+
+export const OPEN_TRANSCRIPT_IMPORT_EVENT = 'ms-credentials-tracker:open-transcript-import';
 
 interface TranscriptDiagnostics {
   textChars: number;
@@ -61,29 +65,60 @@ function pdfErrorMessage(error: TranscriptPdfReadError): string {
   }
 }
 
+function candidateKey(candidate: TranscriptCredentialCandidate, index: number): string {
+  return [
+    candidate.kind,
+    candidate.externalNumber ?? candidate.detectedTitle,
+    candidate.earnedOn ?? '',
+    String(index),
+  ].join(':');
+}
+
 export function TranscriptImport() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<TranscriptParseResult | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
-  const [savedCount, setSavedCount] = useState(() => loadStoredCredentials().length);
+  const [savedCount, setSavedCount] = useState(
+    () => loadStoredCredentials().filter((credential) => !credential.archivedAt).length,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [diagnostics, setDiagnostics] = useState<TranscriptDiagnostics | null>(null);
+  const [resolutionMap, setResolutionMap] = useState<Record<string, string>>({});
 
-  const matchedCount =
-    result?.credentials.filter(
-      (candidate) => candidate.matchStatus === 'matched' && candidate.earnedOn,
-    ).length ?? 0;
-  const unresolvedCount =
-    result?.credentials.filter((candidate) => candidate.matchStatus === 'unresolved').length ?? 0;
+  const effectiveCandidates = useMemo(
+    () =>
+      result?.credentials.map((candidate, index) => {
+        const definitionId = resolutionMap[candidateKey(candidate, index)];
+        if (!definitionId || candidate.matchStatus === 'matched') return candidate;
+        return {
+          ...candidate,
+          matchedDefinitionId: definitionId,
+          matchStatus: 'matched' as const,
+        };
+      }) ?? [],
+    [result, resolutionMap],
+  );
+  const matchedCount = effectiveCandidates.filter(
+    (candidate) => candidate.matchStatus === 'matched' && candidate.earnedOn,
+  ).length;
+  const unresolvedCount = effectiveCandidates.filter(
+    (candidate) => candidate.matchStatus === 'unresolved',
+  ).length;
 
   function openDialog() {
     setMessage(null);
     setLoadError(null);
     dialogRef.current?.showModal();
   }
+
+  useEffect(() => {
+    const open = () => openDialog();
+    window.addEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
+    return () => window.removeEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
+  }, []);
 
   function selectFile(nextFile: File | null) {
     setFile(nextFile);
@@ -92,6 +127,7 @@ export function TranscriptImport() {
     setMessage(null);
     setLoadError(null);
     setDiagnostics(null);
+    setResolutionMap({});
   }
 
   async function analyzePdf() {
@@ -101,6 +137,7 @@ export function TranscriptImport() {
     setResult(null);
     setPageCount(null);
     setDiagnostics(null);
+    setResolutionMap({});
     setIsLoading(true);
 
     try {
@@ -119,12 +156,18 @@ export function TranscriptImport() {
 
   function confirmImport() {
     if (!result) return;
-    const saved = saveConfirmedCredentialCandidates(result.credentials, 'learnTranscriptPdf');
-    setSavedCount(saved.credentials.length);
+    const saved = saveConfirmedCredentialCandidates(effectiveCandidates, 'learnTranscriptPdf');
+    setSavedCount(saved.credentials.filter((credential) => !credential.archivedAt).length);
+
+    const parts: string[] = [];
+    if (saved.addedCount > 0) parts.push(`${saved.addedCount}件を追加`);
+    if (saved.updatedCount > 0) parts.push(`${saved.updatedCount}件を更新`);
+    if (saved.unchangedCount > 0) parts.push(`${saved.unchangedCount}件を再確認`);
+    if (saved.conflictCount > 0) parts.push(`${saved.conflictCount}件は手動修正と競合`);
     setMessage(
-      saved.addedCount > 0
-        ? `${saved.addedCount}件をブラウザに保存しました。`
-        : '新しく保存できる資格はありませんでした。',
+      parts.length > 0
+        ? `${parts.join('、')}しました。`
+        : '保存できる資格はありませんでした。',
     );
   }
 
@@ -217,32 +260,58 @@ export function TranscriptImport() {
 
             {result.credentials.length > 0 ? (
               <ul className="candidate-list">
-                {result.credentials.map((candidate) => (
-                  <li
-                    key={`${candidate.kind}-${candidate.externalNumber ?? candidate.detectedTitle}-${candidate.earnedOn ?? ''}`}
-                  >
-                    <div className="candidate-title">
-                      <strong>{candidate.detectedTitle}</strong>
-                      <span>
-                        {candidate.kind === 'certification' ? 'Certification' : 'Applied Skill'}
-                      </span>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>取得日</dt>
-                        <dd>{candidate.earnedOn ?? '解析できませんでした'}</dd>
+                {result.credentials.map((candidate, index) => {
+                  const key = candidateKey(candidate, index);
+                  const mappedDefinitionId = resolutionMap[key] ?? '';
+                  return (
+                    <li key={key}>
+                      <div className="candidate-title">
+                        <strong>{candidate.detectedTitle}</strong>
+                        <span>
+                          {candidate.kind === 'certification' ? 'Certification' : 'Applied Skill'}
+                        </span>
                       </div>
-                      <div>
-                        <dt>有効期限</dt>
-                        <dd>{candidate.expiresOn ?? '期限なし / 不明'}</dd>
-                      </div>
-                      <div>
-                        <dt>照合</dt>
-                        <dd>{candidate.matchStatus === 'matched' ? '照合済み' : '未照合'}</dd>
-                      </div>
-                    </dl>
-                  </li>
-                ))}
+                      <dl>
+                        <div>
+                          <dt>取得日</dt>
+                          <dd>{candidate.earnedOn ?? '解析できませんでした'}</dd>
+                        </div>
+                        <div>
+                          <dt>有効期限</dt>
+                          <dd>{candidate.expiresOn ?? '期限なし / 不明'}</dd>
+                        </div>
+                        <div>
+                          <dt>照合</dt>
+                          <dd>{candidate.matchStatus === 'matched' || mappedDefinitionId ? '照合済み' : '未照合'}</dd>
+                        </div>
+                      </dl>
+                      {candidate.matchStatus === 'unresolved' ? (
+                        <label className="candidate-resolution">
+                          <span>この資格を手動で照合</span>
+                          <select
+                            value={mappedDefinitionId}
+                            onChange={(event) =>
+                              setResolutionMap((current) => ({
+                                ...current,
+                                [key]: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">未照合のままにする</option>
+                            {credentialDefinitions
+                              .filter((definition) => definition.kind === candidate.kind)
+                              .map((definition) => (
+                                <option value={definition.id} key={definition.id}>
+                                  {definition.displayCode ? `${definition.displayCode} · ` : ''}{definition.canonicalTitle}
+                                </option>
+                              ))}
+                          </select>
+                          <small>タイトルが似ているだけでは自動照合しません。内容を確認して選択してください。</small>
+                        </label>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
 
@@ -303,7 +372,7 @@ export function TranscriptImport() {
 
             <div className="confirm-area">
               <div>
-                <strong>{matchedCount}件を保存できます</strong>
+                <strong>{matchedCount}件を保存・再確認できます</strong>
                 <span>未照合の資格と試験履歴は、この段階では保存しません。</span>
               </div>
               <button
