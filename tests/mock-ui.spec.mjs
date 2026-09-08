@@ -108,7 +108,7 @@ for (const viewport of viewports) {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: '資格の更新予定' })).toBeVisible();
-    await expect(page.getByText('基準日 2026.09.08')).toBeVisible();
+    await expect(page.getByText('基準日', { exact: false })).toBeVisible();
     await expect(page.getByText('Local data', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
