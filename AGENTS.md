@@ -1,7 +1,7 @@
 # Agent Instructions — Microsoft Credentials Tracker
 
-Foundation-Version: 0.3.0
-Foundation-Commit: d9c7d8c6308332f9efb2b8501372f30183b99aea
+Foundation-Version: 0.3.1
+Foundation-Commit: 5382fc2c0735ce82c54dd05c07cb369d4b3b536a
 
 ## Read order
 
