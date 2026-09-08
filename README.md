@@ -36,6 +36,19 @@ npm run build
 npm run test:e2e
 ```
 
+## Deployment
+
+Production hosting uses Vercel with the repository connected through Vercel's Git integration.
+
+- pushes to `main` create Production Deployments;
+- feature branches and Pull Requests create Vercel Preview Deployments;
+- Preview URLs are used for browser and smartphone UI review before merge;
+- GitHub Actions remains responsible for repository quality gates, not hosting deployment.
+
+Vercel detects the Vite application and its normal `npm run build` / `dist` output. The repository keeps only the `vercel.json` SPA fallback required so direct URL access and browser reloads are served through `index.html` instead of returning a hosting 404.
+
+`VITE_GOOGLE_CLIENT_ID` is browser-visible OAuth client configuration, not a client secret. Configure it in the Vercel project for environments where Google Calendar synchronization should be enabled. See `docs/GOOGLE_CALENDAR.md` for the authorized-origin constraint that applies to Preview URLs.
+
 ## Transcript import boundary
 
 The MVP import path is:

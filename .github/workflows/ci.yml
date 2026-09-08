@@ -16,18 +16,3 @@ jobs:
       cache_dependency_path: package-lock.json
       run_test: true
       run_e2e: true
-
-  pages-candidate:
-    name: Build Pages candidate
-    needs: verify
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@5382fc2c0735ce82c54dd05c07cb369d4b3b536a
-    with:
-      node_version_file: .node-version
-      cache_dependency_path: package-lock.json
-      build_command: 'VITE_GOOGLE_CLIENT_ID="${{ vars.VITE_GOOGLE_CLIENT_ID }}" npm run build -- --base="$PAGES_BASE_PATH"'
-      output_directory: dist
-      enable_review_images: true

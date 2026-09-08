@@ -5,15 +5,16 @@
 - Reusable workflow commit: `5382fc2c0735ce82c54dd05c07cb369d4b3b536a`
 - Adopted on: 2026-09-08
 
-## Pages adoption
+## Hosting adoption
 
-- The trusted Pages publisher caller is installed on the default branch before PR preview publication.
-- UI/consumer PRs build an unprivileged Pages candidate.
-- The default-branch `workflow_run` publisher validates provenance before publishing production or `/pr-N/` preview content.
-- The privileged publisher does not checkout or execute PR code.
+- Consumer quality gates continue to use the Foundation `web-ci.yml` workflow pinned to the recorded full commit SHA.
+- Hosting deployment is delegated to Vercel's Git integration rather than a privileged GitHub Actions publisher.
+- Pushes to `main` are the Production deployment path; feature branches and Pull Requests are the Preview deployment path.
+- The repository does not duplicate Vercel Preview deployment with a custom GitHub Actions workflow.
+- Vercel's normal Vite detection is used; repository-specific Vercel configuration is limited to the SPA fallback needed for direct URL access and reloads.
 
 ## App-specific deviations
 
-There are currently no quality-gate deviations for the domain-enabled application.
+Deployment is intentionally different from the Foundation 0.3.1 GitHub Pages publishing path. The quality-gate contract is unchanged: `check`, `typecheck`, `test`, `build`, and browser-rendered E2E remain required.
 
-The previous UI-only unit-test opt-out ended when independently testable transcript parsing and domain normalization were introduced. `check`, `typecheck`, `test`, `build`, and browser-rendered E2E are now required by the consumer CI contract.
+The Vercel Git-integrated Preview workflow should be evaluated as a Foundation follow-up so future consumers can choose it without inheriting Pages candidate/publisher machinery.

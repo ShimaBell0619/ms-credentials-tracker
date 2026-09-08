@@ -13,27 +13,31 @@ The browser uses Google Identity Services (GIS) OAuth token model.
 
 The scope is intentionally narrower than full Calendar access. It allows the application to create secondary calendars and manage events on calendars created by the application.
 
-## Google Cloud setup
+## Google Cloud and Vercel setup
 
 1. Create or choose a Google Cloud project.
 2. Enable **Google Calendar API**.
 3. Configure the Google Auth Platform / OAuth consent screen.
 4. Create an OAuth 2.0 Client ID with application type **Web application**.
-5. Add the production GitHub Pages origin as an authorized JavaScript origin:
-   `https://shimabell0619.github.io`
+5. After the Vercel project has a Production URL, add that exact HTTPS origin to **Authorized JavaScript origins**. Do not invent or pre-document a Production hostname before Vercel assigns it.
 6. If the OAuth app is in Testing, add the intended Google account as a test user.
-7. Add the public Client ID to the GitHub repository Actions variable:
-   `VITE_GOOGLE_CLIENT_ID`
+7. Add the public Client ID to the Vercel project as `VITE_GOOGLE_CLIENT_ID` for Production.
 
 The Client ID is public browser configuration, not a client secret. Never add a Google OAuth client secret to this SPA.
 
-The Pages candidate build forwards the repository variable into Vite. Local development can instead use `.env.local`:
+Local development can use `.env.local`:
 
 ```text
 VITE_GOOGLE_CLIENT_ID=<web-client-id>.apps.googleusercontent.com
 ```
 
 Do not commit `.env.local`.
+
+### Preview deployment constraint
+
+Vercel creates a distinct Preview origin for non-production branches and Pull Requests. Google OAuth **Authorized JavaScript origins require exact origins and do not allow wildcard hostnames**. Therefore arbitrary Vercel Preview URLs cannot all be authorized once with `*.vercel.app`.
+
+Use Vercel Preview Deployments for UI, responsive, import, projection, and other non-OAuth review by default. Google Calendar authorization works on Production after its origin is registered, and on a specific Preview only if that exact Preview origin is explicitly added to the OAuth client. Do not weaken the OAuth model or add a client secret to work around this platform constraint.
 
 ## Calendar ownership and reconciliation
 
