@@ -1,0 +1,33 @@
+name: PDF dependency bootstrap
+
+on:
+  push:
+    branches: [feat/issue-10-transcript-pdf-import]
+    paths:
+      - .github/workflows/pdf-dependency-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-10-transcript-pdf-import
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Add pinned PDF.js dependency
+        run: npm install pdfjs-dist@6.3.289 --save-exact
+      - name: Commit package metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: add PDF.js dependency"
+            git push origin HEAD:feat/issue-10-transcript-pdf-import
+          fi
