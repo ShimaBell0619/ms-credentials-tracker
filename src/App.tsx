@@ -92,21 +92,15 @@ export default function App() {
 
         <div className="header-meta">
           <span className="mock-label">Mock data</span>
-          <time dateTime="2026-09-08">2026.09.08</time>
         </div>
       </header>
 
       <main id="main-content" className="page-frame">
         <section className="overview" aria-labelledby="overview-title">
           <div className="overview-copy">
-            <p className="context-label">更新予定表</p>
-            <h1 id="overview-title">
-              次に必要な更新を、
-              <br />
-              日付から確認する。
-            </h1>
+            <h1 id="overview-title">資格の更新予定</h1>
             <p>
-              取得済み資格の状態と、更新・期限・受験予定を一つの時間軸で確認するモック画面です。
+              サンプル基準日 <time dateTime="2026-09-08">2026.09.08</time>
             </p>
           </div>
 
@@ -223,7 +217,7 @@ export default function App() {
                   <p className="context-label">September</p>
                   <h2 id="calendar-title">2026年9月</h2>
                 </div>
-                <span className="today-key">Today 08</span>
+                <span className="reference-key">基準日 08</span>
               </div>
 
               <table className="calendar" aria-label="2026年9月のカレンダー">
@@ -239,7 +233,7 @@ export default function App() {
                     <tr key={week.id}>
                       {week.days.map(({ id, day }) => (
                         <td
-                          className={day === 8 ? 'is-today' : day === 22 ? 'has-event' : undefined}
+                          className={day === 8 ? 'is-reference' : day === 22 ? 'has-event' : undefined}
                           key={id}
                         >
                           {day ? <span>{day}</span> : null}
