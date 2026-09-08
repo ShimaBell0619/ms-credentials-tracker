@@ -63,9 +63,9 @@ export function GoogleCalendarSync() {
     () => new Set(desiredEvents.map((event) => event.credentialId)).size,
     [desiredEvents],
   );
-  const needsSync =
-    desiredEvents.length > 0 &&
-    (!integration.calendarId || integration.lastDesiredFingerprint !== desiredFingerprint);
+  const needsSync = integration.calendarId
+    ? integration.lastDesiredFingerprint !== desiredFingerprint
+    : desiredEvents.length > 0;
 
   function openDialog() {
     setMessage(null);
