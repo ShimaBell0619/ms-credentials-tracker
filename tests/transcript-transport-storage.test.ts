@@ -52,6 +52,7 @@ const matchedCandidate: TranscriptCredentialCandidate = {
 test('calls the configured transcript API without exposing the URL in the request target', async () => {
   let requestedUrl = '';
   let requestBody = '';
+  const transcriptPayload = JSON.stringify({ certificationData: { activeCertifications: [] } });
   const result = await fetchTranscriptThroughApi(
     'https://func.example.test/api/transcript?ignored=true',
     'https://learn.microsoft.com/ja-jp/users/example/transcript/share-token?tracking=true',
@@ -59,7 +60,7 @@ test('calls the configured transcript API without exposing the URL in the reques
       fetch: async (input, init) => {
         requestedUrl = input.toString();
         requestBody = String(init?.body);
-        return Response.json({ content: '<html><body>Transcript</body></html>' });
+        return Response.json({ content: transcriptPayload });
       },
     },
   );
@@ -68,7 +69,7 @@ test('calls the configured transcript API without exposing the URL in the reques
   assert.deepEqual(JSON.parse(requestBody), {
     url: 'https://learn.microsoft.com/ja-jp/users/example/transcript/share-token',
   });
-  assert.deepEqual(result, { ok: true, html: '<html><body>Transcript</body></html>' });
+  assert.deepEqual(result, { ok: true, content: transcriptPayload });
 });
 
 test('reports transcript API configuration and transport failures', async () => {
@@ -91,12 +92,25 @@ test('persists confirmed credentials once and skips duplicate imports', () => {
   const storage = new MemoryStorage();
   const now = new Date('2026-01-02T03:04:05.000Z');
 
-  const first = saveConfirmedCredentialCandidates([matchedCandidate], 'learnTranscriptShareUrl', storage, now);
-  const duplicate = saveConfirmedCredentialCandidates([matchedCandidate], 'learnTranscriptShareUrl', storage, now);
+  const first = saveConfirmedCredentialCandidates(
+    [matchedCandidate],
+    'learnTranscriptShareUrl',
+    storage,
+    now,
+  );
+  const duplicate = saveConfirmedCredentialCandidates(
+    [matchedCandidate],
+    'learnTranscriptShareUrl',
+    storage,
+    now,
+  );
 
   assert.equal(first.addedCount, 1);
   assert.equal(duplicate.addedCount, 0);
   assert.equal(duplicate.skippedCount, 1);
   assert.equal(loadStoredCredentials(storage).length, 1);
-  assert.match(storage.getItem(CREDENTIAL_STORAGE_KEY) ?? '', /cert\.azure-administrator-associate/);
+  assert.match(
+    storage.getItem(CREDENTIAL_STORAGE_KEY) ?? '',
+    /cert\.azure-administrator-associate/,
+  );
 });

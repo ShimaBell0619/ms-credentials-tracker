@@ -4,16 +4,15 @@ import { normalizeMicrosoftLearnTranscriptShareUrl } from '../../src/domain/tran
 
 export const DEFAULT_TRANSCRIPT_TIMEOUT_MS = 8_000;
 export const DEFAULT_TRANSCRIPT_MAX_BYTES = 2 * 1024 * 1024;
-export const DEFAULT_TRANSCRIPT_MAX_REDIRECTS = 3;
 
 export type TranscriptFetchErrorCode =
   | 'invalidTranscriptUrl'
   | 'privateDestination'
-  | 'tooManyRedirects'
-  | 'missingRedirectLocation'
   | 'timeout'
   | 'upstreamFailure'
+  | 'unexpectedRedirect'
   | 'unexpectedContentType'
+  | 'invalidJson'
   | 'responseTooLarge';
 
 export class TranscriptFetchError extends Error {
@@ -34,12 +33,14 @@ export interface TranscriptFetchDependencies {
 export interface TranscriptFetchOptions {
   timeoutMs?: number;
   maxBytes?: number;
-  maxRedirects?: number;
 }
 
 function isPublicIpv4(address: string): boolean {
   const octets = address.split('.').map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+  if (
+    octets.length !== 4 ||
+    octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+  ) {
     return false;
   }
 
@@ -63,7 +64,12 @@ function isPublicIpv6(address: string): boolean {
     const mapped = normalized.slice('::ffff:'.length);
     if (mapped.includes('.')) return isPublicIpv4(mapped);
     const [high, low] = mapped.split(':').map((part) => Number.parseInt(part, 16));
-    if (high !== undefined && low !== undefined && Number.isInteger(high) && Number.isInteger(low)) {
+    if (
+      high !== undefined &&
+      low !== undefined &&
+      Number.isInteger(high) &&
+      Number.isInteger(low)
+    ) {
       return isPublicIpv4(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
     }
     return false;
@@ -91,10 +97,20 @@ async function assertPublicDestination(
   }
 }
 
-function validatedUrl(value: string): URL {
-  const result = normalizeMicrosoftLearnTranscriptShareUrl(value);
+export function buildMicrosoftLearnTranscriptApiUrl(inputUrl: string): URL {
+  const result = normalizeMicrosoftLearnTranscriptShareUrl(inputUrl);
   if (!result.ok) throw new TranscriptFetchError('invalidTranscriptUrl');
-  return new URL(result.url);
+
+  const shareUrl = new URL(result.url);
+  const shareId = shareUrl.pathname.split('/').filter(Boolean).at(-1);
+  if (!shareId) throw new TranscriptFetchError('invalidTranscriptUrl');
+
+  const apiUrl = new URL(
+    `/api/profiles/transcript/share/${encodeURIComponent(shareId)}`,
+    'https://learn.microsoft.com',
+  );
+  apiUrl.searchParams.set('locale', 'en-us');
+  return apiUrl;
 }
 
 async function readBodyWithLimit(response: Response, maxBytes: number): Promise<string> {
@@ -123,10 +139,6 @@ async function readBodyWithLimit(response: Response, maxBytes: number): Promise<
   return body + decoder.decode();
 }
 
-function isRedirect(status: number): boolean {
-  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
-}
-
 function normalizeFetchFailure(error: unknown): never {
   if (error instanceof TranscriptFetchError) throw error;
   if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
@@ -142,48 +154,49 @@ export async function fetchMicrosoftLearnTranscript(
 ): Promise<string> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TRANSCRIPT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_TRANSCRIPT_MAX_BYTES;
-  const maxRedirects = options.maxRedirects ?? DEFAULT_TRANSCRIPT_MAX_REDIRECTS;
   const fetchImpl = dependencies.fetch ?? fetch;
   const resolver = dependencies.resolveHostname ?? ((hostname) => lookup(hostname, { all: true }));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let currentUrl = validatedUrl(inputUrl);
+  const apiUrl = buildMicrosoftLearnTranscriptApiUrl(inputUrl);
 
   try {
-    for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
-      await assertPublicDestination(currentUrl.hostname, resolver);
-      const response = await fetchImpl(currentUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: {
-          accept: 'text/html,application/xhtml+xml',
-          'user-agent': 'ms-credentials-tracker-transcript-fetcher/1.0',
-        },
-      });
+    await assertPublicDestination(apiUrl.hostname, resolver);
+    const response = await fetchImpl(apiUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'Mozilla/5.0 (compatible; ms-credentials-tracker/1.0)',
+      },
+    });
 
-      if (isRedirect(response.status)) {
-        if (redirectCount === maxRedirects) {
-          throw new TranscriptFetchError('tooManyRedirects');
-        }
-        const location = response.headers.get('location');
-        if (!location) throw new TranscriptFetchError('missingRedirectLocation');
-        currentUrl = validatedUrl(new URL(location, currentUrl).toString());
-        continue;
-      }
-
-      if (!response.ok) throw new TranscriptFetchError('upstreamFailure');
-      const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-      if (!contentType.startsWith('text/html') && !contentType.startsWith('application/xhtml+xml')) {
-        throw new TranscriptFetchError('unexpectedContentType');
-      }
-      return await readBodyWithLimit(response, maxBytes);
+    if (response.status >= 300 && response.status < 400) {
+      throw new TranscriptFetchError('unexpectedRedirect');
     }
+    if (!response.ok) throw new TranscriptFetchError('upstreamFailure');
+
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (!/^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(contentType)) {
+      throw new TranscriptFetchError('unexpectedContentType');
+    }
+
+    const body = await readBodyWithLimit(response, maxBytes);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      throw new TranscriptFetchError('invalidJson');
+    }
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new TranscriptFetchError('invalidJson');
+    }
+
+    return JSON.stringify(parsed);
   } catch (error) {
     normalizeFetchFailure(error);
   } finally {
     clearTimeout(timeout);
   }
-
-  throw new TranscriptFetchError('upstreamFailure');
 }

@@ -96,19 +96,32 @@ Pipeline:
 1. user pastes a Transcript share URL
 2. application validates that it is an HTTPS `learn.microsoft.com` Transcript share URL
 3. browser sends the normalized URL to the dedicated stateless Transcript Function in a POST body
-4. the Function independently validates the URL and each redirect, resolves only public destinations, and retrieves the public shared Transcript without credentials
-5. returned HTML is reduced to text and passed to the Transcript parser
-6. parser extracts supported external records and normalizes them into `ImportCandidate` values
-7. candidates are matched against the local `CredentialDefinition` catalog
-8. unresolved candidates remain unresolved; the application must not invent a credential identity
-9. user explicitly reviews and confirms candidates
-10. only confirmed, matched records become application data
+4. the Function independently validates the share URL and extracts only its share identifier
+5. the Function constructs the fixed Microsoft Learn Transcript JSON endpoint internally with `locale=en-us`
+6. the returned JSON is passed to the Transcript API source adapter
+7. the adapter extracts supported external records and normalizes them into `ImportCandidate` values
+8. candidates are matched against the local `CredentialDefinition` catalog
+9. unresolved candidates remain unresolved; the application must not invent a credential identity
+10. user explicitly reviews and confirms candidates
+11. only confirmed, matched records become application data
 
-The share URL itself is transport input and is not persisted as application credential data.
+The share URL itself is transport input and is not persisted as application credential data. Raw Transcript JSON is neither persisted nor logged by the application.
 
-The shared Transcript page and copied-text layout are not treated as Microsoft API contracts. Parsing must therefore remain tolerant and conservative. The dedicated Function replaces only the transport step; candidate normalization, confirmation, and browser-local storage remain unchanged. It is not a general-purpose proxy, does not log the Transcript URL or HTML, and applies a redirect limit, request timeout, response-size limit, strict host/path validation, and public-IP checks. Third-party CORS proxy services are not an acceptable production path.
+### Transport implementation note
 
-PDF import and manual-entry UX are follow-up input paths. A future Microsoft API or synchronization path must enter through the same reconciliation boundary rather than bypassing user-owned application state.
+The official browser-visible Transcript sharing flow is supported by Microsoft Learn, but the JSON endpoint currently used by the Function is not a documented public Microsoft API contract. The observed endpoint shape is:
+
+```text
+https://learn.microsoft.com/api/profiles/transcript/share/{share-id}?locale=en-us
+```
+
+It is therefore treated as a replaceable, best-effort source adapter for this personal MVP rather than as an authoritative synchronization contract. The Function never accepts this upstream URL from the caller; it constructs the fixed host/path from a previously validated official Transcript share URL.
+
+The initial browser-visible page HTML is retained only as a temporary compatibility fallback during rollout. Empirical validation showed that the initial shared-page HTML is a client-rendered shell and does not contain the credential records needed for import.
+
+If the undocumented endpoint changes, import must fail closed without changing confirmed application state. Future manual/PDF input or a supported Microsoft API can enter through the same reconciliation boundary without bypassing user confirmation.
+
+Third-party CORS proxy services and arbitrary/general-purpose proxy behavior are not acceptable production paths.
 
 ## Current UI boundary
 

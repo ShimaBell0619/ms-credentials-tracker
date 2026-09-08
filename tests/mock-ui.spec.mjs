@@ -47,21 +47,28 @@ test('transcript share URL import requires confirmation and persists matched cre
     await route.fulfill({
       status: 200,
       contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify({ content: `<!doctype html><html><body>
-        <main>
-          <h1>Transcript</h1>
-          <section>
-            Active certifications
-            Certification title Certification number Earned on Expires on
-            Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027
-          </section>
-          <section>
-            Passed exams
-            Exam title Exam number Passed date
-            Microsoft Azure Administrator AZ-104 Mar 14, 2026
-          </section>
-        </main>
-      </body></html>` }),
+      body: JSON.stringify({
+        content: JSON.stringify({
+          certificationData: {
+            activeCertifications: [
+              {
+                name: 'Azure Administrator Associate',
+                certificationNumber: 'BFC4DD-8BDAB2',
+                dateEarned: '2026-03-14T00:00:00Z',
+                expiration: '2027-03-15T00:00:00Z',
+              },
+            ],
+            passedExams: [
+              {
+                examTitle: 'Microsoft Azure Administrator',
+                examNumber: 'AZ-104',
+                examDateTaken: '2026-03-14T00:00:00Z',
+              },
+            ],
+          },
+          appliedSkillsData: { appliedSkillsCredentials: [] },
+        }),
+      }),
     });
   });
 
@@ -78,7 +85,9 @@ test('transcript share URL import requires confirmation and persists matched cre
   await dialog.getByRole('button', { name: '共有URLから読み込む' }).click();
 
   await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
-  expect(requestedUrl).toBe('https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken');
+  expect(requestedUrl).toBe(
+    'https://learn.microsoft.com/ja-jp/users/12345678/transcript/exampletoken',
+  );
   await expect(dialog.locator('.candidate-title strong')).toHaveText(
     'Microsoft Certified: Azure Administrator Associate',
   );
@@ -100,7 +109,11 @@ test('transcript share URL import requires confirmation and persists matched cre
 
 test('transcript share URL import reports API failures', async ({ page }) => {
   await page.route('https://func.example.test/api/transcript', async (route) => {
-    await route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"upstreamFailure"}' });
+    await route.fulfill({
+      status: 502,
+      contentType: 'application/json',
+      body: '{"error":"upstreamFailure"}',
+    });
   });
 
   await page.goto('/');

@@ -7,7 +7,7 @@ export type TranscriptApiError =
   | 'upstreamRejected';
 
 export type TranscriptApiResult =
-  | { ok: true; html: string }
+  | { ok: true; content: string }
   | { ok: false; error: TranscriptApiError; status: number | null };
 
 export interface TranscriptApiDependencies {
@@ -65,7 +65,7 @@ export async function fetchTranscriptThroughApi(
       return { ok: false, error: 'requestFailed', status: response.status };
     }
 
-    return { ok: true, html: payload.content };
+    return { ok: true, content: payload.content };
   } catch {
     return { ok: false, error: 'requestFailed', status: null };
   }

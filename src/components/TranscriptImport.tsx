@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { parseMicrosoftLearnTranscriptApiPayload } from '../domain/transcript-api-import.ts';
 import {
   analyzeTranscriptHtml,
   describeTranscriptDiagnostic,
@@ -42,7 +43,8 @@ export function TranscriptImport() {
     result?.credentials.filter(
       (candidate) => candidate.matchStatus === 'matched' && candidate.earnedOn,
     ).length ?? 0;
-  const unresolvedCount = result?.credentials.filter((candidate) => candidate.matchStatus === 'unresolved').length ?? 0;
+  const unresolvedCount =
+    result?.credentials.filter((candidate) => candidate.matchStatus === 'unresolved').length ?? 0;
 
   function openDialog() {
     setMessage(null);
@@ -71,16 +73,25 @@ export function TranscriptImport() {
         } else if (response.status) {
           setLoadError(`Microsoft Learn から取得できませんでした（HTTP ${response.status}）。`);
         } else {
-          setLoadError('Transcript 取得サービスへ接続できませんでした。時間をおいて再度お試しください。');
+          setLoadError(
+            'Transcript 取得サービスへ接続できませんでした。時間をおいて再度お試しください。',
+          );
         }
         return;
       }
 
-      const transcriptText = transcriptHtmlToText(response.html);
+      const apiResult = parseMicrosoftLearnTranscriptApiPayload(response.content);
+      if (apiResult) {
+        setResult(apiResult);
+        return;
+      }
+
+      // Compatibility fallback for previously deployed HTML transport while the API transport rolls out.
+      const transcriptText = transcriptHtmlToText(response.content);
       const parsed = parseMicrosoftLearnTranscript(transcriptText);
       setResult(parsed);
       if (parsed.credentials.length === 0 && parsed.exams.length === 0) {
-        setDiagnostics(analyzeTranscriptHtml(response.html));
+        setDiagnostics(analyzeTranscriptHtml(response.content));
       }
     } catch {
       setLoadError('Transcript 取得サービスで予期しないエラーが発生しました。');
@@ -154,7 +165,11 @@ export function TranscriptImport() {
           <span>共有URL自体は保存しません</span>
         </div>
 
-        {loadError ? <p className="load-error" role="alert">{loadError}</p> : null}
+        {loadError ? (
+          <p className="load-error" role="alert">
+            {loadError}
+          </p>
+        ) : null}
 
         {result ? (
           <section className="import-results" aria-labelledby="import-results-title">
@@ -186,10 +201,14 @@ export function TranscriptImport() {
             {result.credentials.length > 0 ? (
               <ul className="candidate-list">
                 {result.credentials.map((candidate) => (
-                  <li key={`${candidate.kind}-${candidate.externalNumber ?? candidate.detectedTitle}-${candidate.earnedOn ?? ''}`}>
+                  <li
+                    key={`${candidate.kind}-${candidate.externalNumber ?? candidate.detectedTitle}-${candidate.earnedOn ?? ''}`}
+                  >
                     <div className="candidate-title">
                       <strong>{candidate.detectedTitle}</strong>
-                      <span>{candidate.kind === 'certification' ? 'Certification' : 'Applied Skill'}</span>
+                      <span>
+                        {candidate.kind === 'certification' ? 'Certification' : 'Applied Skill'}
+                      </span>
                     </div>
                     <dl>
                       <div>
@@ -241,23 +260,77 @@ export function TranscriptImport() {
                 <details className="exam-results" open>
                   <summary>診断情報（個人データは表示しません）</summary>
                   <ul>
-                    <li><strong>HTML</strong><span>{diagnostics.htmlLength}文字</span></li>
-                    <li><strong>本文相当</strong><span>{diagnostics.bodyTextLength}文字</span></li>
-                    <li><strong>lang</strong><span>{diagnostics.documentLang ?? '不明'}</span></li>
-                    <li><strong>script</strong><span>{diagnostics.scriptCount}件（外部 {diagnostics.externalScriptCount} / inline {diagnostics.inlineScriptCount}）</span></li>
-                    <li><strong>iframe</strong><span>{diagnostics.iframeCount}件</span></li>
-                    <li><strong>Certified</strong><span>{yesNo(diagnostics.containsMicrosoftCertified)}</span></li>
-                    <li><strong>Applied Skills</strong><span>{yesNo(diagnostics.containsAppliedSkills)}</span></li>
-                    <li><strong>Passed exams</strong><span>{yesNo(diagnostics.containsPassedExams)}</span></li>
-                    <li><strong>Earned on</strong><span>{yesNo(diagnostics.containsEarnedOn)}</span></li>
-                    <li><strong>日本語日付</strong><span>{yesNo(diagnostics.containsJapaneseDate)}</span></li>
-                    <li><strong>Transcript語</strong><span>{yesNo(diagnostics.containsTranscriptToken)}</span></li>
-                    <li><strong>Credential語</strong><span>{yesNo(diagnostics.containsCredentialToken)}</span></li>
-                    <li><strong>API hint</strong><span>{yesNo(diagnostics.containsApiHint)}</span></li>
-                    <li><strong>Client runtime</strong><span>{yesNo(diagnostics.containsClientRuntimeHint)}</span></li>
-                    <li><strong>Hydration data</strong><span>{yesNo(diagnostics.containsHydrationData)}</span></li>
-                    <li><strong>Transcript iframe</strong><span>{yesNo(diagnostics.containsIframeTranscriptHint)}</span></li>
-                    <li><strong>404 / denied</strong><span>{yesNo(diagnostics.containsNotFoundOrDeniedMarker)}</span></li>
+                    <li>
+                      <strong>HTML</strong>
+                      <span>{diagnostics.htmlLength}文字</span>
+                    </li>
+                    <li>
+                      <strong>本文相当</strong>
+                      <span>{diagnostics.bodyTextLength}文字</span>
+                    </li>
+                    <li>
+                      <strong>lang</strong>
+                      <span>{diagnostics.documentLang ?? '不明'}</span>
+                    </li>
+                    <li>
+                      <strong>script</strong>
+                      <span>
+                        {diagnostics.scriptCount}件（外部 {diagnostics.externalScriptCount} / inline{' '}
+                        {diagnostics.inlineScriptCount}）
+                      </span>
+                    </li>
+                    <li>
+                      <strong>iframe</strong>
+                      <span>{diagnostics.iframeCount}件</span>
+                    </li>
+                    <li>
+                      <strong>Certified</strong>
+                      <span>{yesNo(diagnostics.containsMicrosoftCertified)}</span>
+                    </li>
+                    <li>
+                      <strong>Applied Skills</strong>
+                      <span>{yesNo(diagnostics.containsAppliedSkills)}</span>
+                    </li>
+                    <li>
+                      <strong>Passed exams</strong>
+                      <span>{yesNo(diagnostics.containsPassedExams)}</span>
+                    </li>
+                    <li>
+                      <strong>Earned on</strong>
+                      <span>{yesNo(diagnostics.containsEarnedOn)}</span>
+                    </li>
+                    <li>
+                      <strong>日本語日付</strong>
+                      <span>{yesNo(diagnostics.containsJapaneseDate)}</span>
+                    </li>
+                    <li>
+                      <strong>Transcript語</strong>
+                      <span>{yesNo(diagnostics.containsTranscriptToken)}</span>
+                    </li>
+                    <li>
+                      <strong>Credential語</strong>
+                      <span>{yesNo(diagnostics.containsCredentialToken)}</span>
+                    </li>
+                    <li>
+                      <strong>API hint</strong>
+                      <span>{yesNo(diagnostics.containsApiHint)}</span>
+                    </li>
+                    <li>
+                      <strong>Client runtime</strong>
+                      <span>{yesNo(diagnostics.containsClientRuntimeHint)}</span>
+                    </li>
+                    <li>
+                      <strong>Hydration data</strong>
+                      <span>{yesNo(diagnostics.containsHydrationData)}</span>
+                    </li>
+                    <li>
+                      <strong>Transcript iframe</strong>
+                      <span>{yesNo(diagnostics.containsIframeTranscriptHint)}</span>
+                    </li>
+                    <li>
+                      <strong>404 / denied</strong>
+                      <span>{yesNo(diagnostics.containsNotFoundOrDeniedMarker)}</span>
+                    </li>
                   </ul>
                 </details>
               </>
@@ -268,12 +341,21 @@ export function TranscriptImport() {
                 <strong>{matchedCount}件を保存できます</strong>
                 <span>未照合の資格と試験履歴は、この段階では保存しません。</span>
               </div>
-              <button className="primary-action" type="button" onClick={confirmImport} disabled={matchedCount === 0}>
+              <button
+                className="primary-action"
+                type="button"
+                onClick={confirmImport}
+                disabled={matchedCount === 0}
+              >
                 確認して保存
               </button>
             </div>
 
-            {message ? <p className="save-message" role="status">{message}</p> : null}
+            {message ? (
+              <p className="save-message" role="status">
+                {message}
+              </p>
+            ) : null}
           </section>
         ) : null}
       </dialog>

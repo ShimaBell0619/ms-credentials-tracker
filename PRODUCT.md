@@ -6,7 +6,7 @@ Build a personal web application that lets a user quickly understand Microsoft c
 
 ## Current milestone
 
-The initial UI baseline is established by PR #5. The current milestone introduces the first credential-domain logic and a dedicated stateless Azure Functions transport for Microsoft Learn Transcript shared-URL import. Server-side persistence, authentication, and Microsoft API integration remain deferred.
+The initial UI baseline is established by PR #5. The current milestone introduces the first credential-domain logic and a dedicated stateless Azure Functions transport for Microsoft Learn Transcript shared-URL import. Server-side persistence and authentication remain deferred.
 
 The selected UI baseline remains date-led: the user should identify the next required credential action first, then inspect the 90-day schedule and individual credential records.
 
@@ -35,7 +35,8 @@ The existing schedule/register content remains static mock data until imported c
 - distinguish Certifications, Applied Skills, exams, planned exams, and credential lifecycle history
 - keep confirmed facts separate from derived status/schedule values
 - accept and validate Microsoft Learn Transcript share URLs
-- retrieve the public shared Transcript through a narrowly scoped Azure Function and parse the returned content into import candidates
+- use a narrowly scoped Azure Function to derive and retrieve the public Transcript JSON representation from the share identifier
+- normalize supported Certification, Applied Skills, and passed-exam records into import candidates
 - match candidates conservatively against a local credential catalog
 - require explicit user confirmation before saving imported credentials
 - use versioned browser-local storage as the provisional MVP application source of truth
@@ -43,11 +44,13 @@ The existing schedule/register content remains static mock data until imported c
 
 ## Non-goals for the current milestone
 
-- Microsoft / Entra authentication
+- Microsoft / Entra end-user authentication
 - server-side database or general-purpose proxy API
 - automatic Microsoft synchronization
+- treating an undocumented Microsoft Learn endpoint as a supported long-term API contract
 - Microsoft Graph as the credential-history source of truth
 - third-party CORS proxy services
+- Azure Container Apps / browser-rendering infrastructure unless a future requirement makes it necessary
 - PDF parsing
 - complete manual-entry workflow
 - notifications, email, or ICS generation
@@ -59,9 +62,9 @@ After user confirmation, application-owned credential data is the working source
 
 For the MVP, confirmed data is stored in the browser. Server-side persistence and authentication are intentionally deferred until credential acquisition and domain behavior are better validated.
 
-The shared-URL transport is a trusted stateless Azure Function. It only accepts validated Microsoft Learn Transcript URLs and does not introduce server-side credential persistence or change the import/reconciliation contract.
+The shared-URL transport is a trusted stateless Azure Function. It accepts only validated Microsoft Learn Transcript share URLs and constructs the current fixed Microsoft Learn Transcript JSON endpoint internally. Because that JSON endpoint is undocumented, it is a replaceable best-effort input adapter rather than a synchronization contract.
 
-See `docs/DOMAIN.md` for the approved domain contract and storage boundary.
+See `docs/DOMAIN.md` for the approved domain contract and storage boundary, and `docs/AZURE.md` for the transport security boundary.
 
 ## Language policy
 

@@ -4,9 +4,9 @@ A UI-first web application for reviewing Microsoft certification status, renewal
 
 ## Current state
 
-The initial responsive UI baseline is implemented with static mock data. A Microsoft Learn Transcript share URL can be fetched through the dedicated Azure Function, parsed into import candidates, explicitly confirmed, and persisted in versioned browser-local storage.
+The initial responsive UI baseline is implemented with static mock data. A Microsoft Learn Transcript share URL can be sent to the dedicated Azure Function, normalized through the current public Transcript JSON representation, parsed into import candidates, explicitly confirmed, and persisted in versioned browser-local storage.
 
-The next development phase should introduce domain logic incrementally, starting with the credential data model and application source-of-truth design before authentication, persistence, or Microsoft integrations.
+The main schedule/register still uses mock data; imported records do not drive those projections yet.
 
 ## Development
 
@@ -28,11 +28,14 @@ npm run build
 npm run test:e2e
 ```
 
-Azure infrastructure, OIDC bootstrap, deployment, and operational boundaries are documented in `docs/AZURE.md`.
+Azure infrastructure, OIDC bootstrap, deployment, and the Transcript transport security boundary are documented in `docs/AZURE.md`. Credential-domain and import/reconciliation rules are documented in `docs/DOMAIN.md`.
 
 ## Current limitations
 
-The main schedule and credential register remain static mock data. Imported records are browser-local and intentionally do not drive those projections yet. There is no Microsoft account authentication, database, automatic synchronization, real renewal calculation, or notification integration.
+- The main schedule and credential register remain static mock data.
+- Imported records are browser-local and intentionally do not drive those projections yet.
+- There is no Microsoft account authentication, server-side database, automatic synchronization, real renewal calculation, or notification integration.
+- The current Microsoft Learn Transcript JSON endpoint is an undocumented implementation detail. It is suitable as a best-effort personal-MVP input adapter but may change without notice; confirmed application data must not depend on it remaining available.
 
 ## Documentation language
 

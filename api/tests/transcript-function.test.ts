@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleTranscriptRequest, type TranscriptRequest } from '../src/transcript-endpoint.ts';
 import {
+  buildMicrosoftLearnTranscriptApiUrl,
   fetchMicrosoftLearnTranscript,
   isPublicIpAddress,
   TranscriptFetchError,
@@ -9,10 +10,10 @@ import {
 
 const publicResolver = async () => [{ address: '13.107.246.40', family: 4 }] as const;
 
-function responseHtml(body = '<html><body>Transcript</body></html>', init: ResponseInit = {}) {
-  return new Response(body, {
+function responseJson(body: unknown = { certificationData: { activeCertifications: [] } }, init: ResponseInit = {}) {
+  return new Response(JSON.stringify(body), {
     status: 200,
-    headers: { 'content-type': 'text/html; charset=utf-8' },
+    headers: { 'content-type': 'application/json; charset=utf-8' },
     ...init,
   });
 }
@@ -25,23 +26,38 @@ function request(body: unknown, origin = 'https://shimabell0619.github.io'): Tra
   };
 }
 
-test('fetches a validated Microsoft Learn transcript', async () => {
+test('derives the fixed Microsoft Learn transcript API URL from a validated share URL', () => {
+  assert.equal(
+    buildMicrosoftLearnTranscriptApiUrl(
+      'https://learn.microsoft.com/ja-jp/users/example/transcript/share-id?tracking=true#section',
+    ).toString(),
+    'https://learn.microsoft.com/api/profiles/transcript/share/share-id?locale=en-us',
+  );
+});
+
+test('fetches transcript JSON through the fixed Microsoft Learn API endpoint', async () => {
   const content = await fetchMicrosoftLearnTranscript(
     'https://learn.microsoft.com/ja-jp/users/example/transcript/share-id?tracking=true#section',
     {},
     {
       resolveHostname: publicResolver,
-      fetch: async (input) => {
-        assert.equal(input.toString(), 'https://learn.microsoft.com/ja-jp/users/example/transcript/share-id');
-        return responseHtml();
+      fetch: async (input, init) => {
+        assert.equal(
+          input.toString(),
+          'https://learn.microsoft.com/api/profiles/transcript/share/share-id?locale=en-us',
+        );
+        assert.equal(init?.redirect, 'manual');
+        return responseJson({ certificationData: { activeCertifications: [{ name: 'Example' }] } });
       },
     },
   );
 
-  assert.equal(content, '<html><body>Transcript</body></html>');
+  assert.deepEqual(JSON.parse(content), {
+    certificationData: { activeCertifications: [{ name: 'Example' }] },
+  });
 });
 
-test('rejects redirects away from the Microsoft Learn transcript allowlist', async () => {
+test('rejects redirects instead of following an unexpected upstream destination', async () => {
   await assert.rejects(
     fetchMicrosoftLearnTranscript(
       'https://learn.microsoft.com/users/example/transcript/share-id',
@@ -52,7 +68,7 @@ test('rejects redirects away from the Microsoft Learn transcript allowlist', asy
           new Response(null, { status: 302, headers: { location: 'https://example.com/internal' } }),
       },
     ),
-    (error: unknown) => error instanceof TranscriptFetchError && error.code === 'invalidTranscriptUrl',
+    (error: unknown) => error instanceof TranscriptFetchError && error.code === 'unexpectedRedirect',
   );
 });
 
@@ -73,7 +89,7 @@ test('rejects private and local destination addresses', async () => {
       {},
       {
         resolveHostname: async () => [{ address: '127.0.0.1', family: 4 }],
-        fetch: async () => responseHtml(),
+        fetch: async () => responseJson(),
       },
     ),
     (error: unknown) => error instanceof TranscriptFetchError && error.code === 'privateDestination',
@@ -99,32 +115,59 @@ test('enforces a whole-request timeout', async () => {
   );
 });
 
-test('rejects an oversized transcript response', async () => {
+test('rejects oversized, non-JSON, and malformed JSON upstream responses', async () => {
   await assert.rejects(
     fetchMicrosoftLearnTranscript(
       'https://learn.microsoft.com/users/example/transcript/share-id',
       { maxBytes: 8 },
       {
         resolveHostname: publicResolver,
-        fetch: async () => responseHtml('this body is larger than eight bytes'),
+        fetch: async () => responseJson({ value: 'this is too large' }),
       },
     ),
     (error: unknown) => error instanceof TranscriptFetchError && error.code === 'responseTooLarge',
   );
+
+  await assert.rejects(
+    fetchMicrosoftLearnTranscript(
+      'https://learn.microsoft.com/users/example/transcript/share-id',
+      {},
+      {
+        resolveHostname: publicResolver,
+        fetch: async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } }),
+      },
+    ),
+    (error: unknown) => error instanceof TranscriptFetchError && error.code === 'unexpectedContentType',
+  );
+
+  await assert.rejects(
+    fetchMicrosoftLearnTranscript(
+      'https://learn.microsoft.com/users/example/transcript/share-id',
+      {},
+      {
+        resolveHostname: publicResolver,
+        fetch: async () => new Response('{', { headers: { 'content-type': 'application/json' } }),
+      },
+    ),
+    (error: unknown) => error instanceof TranscriptFetchError && error.code === 'invalidJson',
+  );
 });
 
-test('returns transcript content with only the approved browser origin', async () => {
+test('returns transcript JSON with only the approved browser origin', async () => {
   const response = await handleTranscriptRequest(
     request({ url: 'https://learn.microsoft.com/users/example/transcript/share-id' }),
     {
       resolveHostname: publicResolver,
-      fetch: async () => responseHtml(),
+      fetch: async () => responseJson({ userName: 'example-user', certificationData: {} }),
     },
   );
 
   assert.equal(response.status, 200);
   assert.equal(response.headers?.['access-control-allow-origin'], 'https://shimabell0619.github.io');
-  assert.deepEqual(response.jsonBody, { content: '<html><body>Transcript</body></html>' });
+  assert.deepEqual(JSON.parse(String((response.jsonBody as { content: string }).content)), {
+    userName: 'example-user',
+    certificationData: {},
+  });
 });
 
 test('rejects an unapproved browser origin before fetching', async () => {
@@ -138,7 +181,7 @@ test('rejects an unapproved browser origin before fetching', async () => {
       resolveHostname: publicResolver,
       fetch: async () => {
         fetched = true;
-        return responseHtml();
+        return responseJson();
       },
     },
   );
@@ -167,7 +210,7 @@ test('maps timeout and oversized upstream responses to bounded transport failure
       fetch: async () =>
         new Response(null, {
           status: 200,
-          headers: { 'content-type': 'text/html', 'content-length': '3000000' },
+          headers: { 'content-type': 'application/json', 'content-length': '3000000' },
         }),
     },
   );
