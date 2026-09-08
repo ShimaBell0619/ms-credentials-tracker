@@ -7,7 +7,7 @@
     "dev": "vite",
     "check": "biome lint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/transcript-import.test.ts tests/credential-projection.test.ts tests/credential-maintenance.test.ts",
+    "test": "node --test tests/transcript-import.test.ts tests/credential-projection.test.ts tests/credential-maintenance.test.ts tests/google-calendar-sync.test.ts",
     "build": "vite build",
     "postbuild": "node scripts/verify-pages-build.mjs",
     "preview": "vite preview",
