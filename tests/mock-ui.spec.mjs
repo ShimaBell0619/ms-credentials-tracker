@@ -209,13 +209,13 @@ test('Transcript PDF import updates the live credential projection and persists 
   );
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
-  await expect(dialog.getByText('1件をブラウザに保存しました。')).toBeVisible();
+  await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
   await expect(page.locator('.saved-count')).toContainText('1');
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
   await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
   const stored = await page.evaluate(() =>
-    JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v1')),
+    JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v2')),
   );
   expect(stored.credentials[0].source).toBe('learnTranscriptPdf');
 

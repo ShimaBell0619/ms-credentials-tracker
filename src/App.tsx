@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { TranscriptImport } from './components/TranscriptImport';
+import { ManualCredentialDialog } from './components/ManualCredentialDialog';
+import {
+  OPEN_TRANSCRIPT_IMPORT_EVENT,
+  TranscriptImport,
+} from './components/TranscriptImport';
+import { getCredentialDefinition } from './domain/credential-catalog';
+import { buildTranscriptRefreshState } from './domain/credential-freshness';
 import {
   addDaysIso,
   buildCredentialDashboard,
@@ -12,6 +18,8 @@ import {
 import {
   CREDENTIAL_STORAGE_CHANGED_EVENT,
   loadStoredCredentials,
+  setCredentialArchived,
+  type StoredCredential,
 } from './storage/local-credential-store';
 
 const statusText: Record<CredentialDerivedStatus, string> = {
@@ -175,11 +183,25 @@ function StatusText({ status }: { status: CredentialDerivedStatus }) {
 
 export default function App() {
   const [storedCredentials, setStoredCredentials] = useState(() => loadStoredCredentials());
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [editingCredential, setEditingCredential] = useState<StoredCredential | null>(null);
   const referenceDate = localDateToIso(new Date());
   const timelineEnd = addDaysIso(referenceDate, 89);
   const dashboard = useMemo(
     () => buildCredentialDashboard(storedCredentials, referenceDate),
     [storedCredentials, referenceDate],
+  );
+  const refreshState = useMemo(
+    () => buildTranscriptRefreshState(storedCredentials, referenceDate),
+    [storedCredentials, referenceDate],
+  );
+  const archivedCredentials = useMemo(
+    () => storedCredentials.filter((credential) => credential.archivedAt),
+    [storedCredentials],
+  );
+  const storedById = useMemo(
+    () => new Map(storedCredentials.map((credential) => [credential.id, credential] as const)),
+    [storedCredentials],
   );
   const months = monthSequence(referenceDate, timelineEnd);
   const calendar = buildCalendar(referenceDate, dashboard.scheduleEvents);
@@ -193,6 +215,20 @@ export default function App() {
       window.removeEventListener('storage', refresh);
     };
   }, []);
+
+  function openManualEditor(credential: StoredCredential | null) {
+    setEditingCredential(credential);
+    setManualDialogOpen(true);
+  }
+
+  function closeManualEditor() {
+    setManualDialogOpen(false);
+    setEditingCredential(null);
+  }
+
+  function openTranscriptImport() {
+    window.dispatchEvent(new Event(OPEN_TRANSCRIPT_IMPORT_EVENT));
+  }
 
   return (
     <div className="app-shell">
@@ -215,12 +251,38 @@ export default function App() {
         </nav>
 
         <div className="header-meta">
+          <button className="manual-trigger" type="button" onClick={() => openManualEditor(null)}>
+            手動追加
+          </button>
           <TranscriptImport />
           <span className="mock-label">Local data</span>
         </div>
       </header>
 
       <main id="main-content" className="page-frame">
+        {refreshState.shouldPrompt ? (
+          <section className="freshness-banner" aria-labelledby="freshness-title">
+            <div className="freshness-copy">
+              <p className="context-label">Transcript refresh</p>
+              <h2 id="freshness-title">資格情報を確認してください</h2>
+              <p>
+                更新可能時期を迎えた資格が{refreshState.credentials.length}件あります。Microsoft Learn Transcriptを再インポートして最新状態を確認してください。
+              </p>
+              <ul>
+                {refreshState.credentials.slice(0, 3).map((credential) => (
+                  <li key={`refresh-${credential.id}`}>
+                    {credential.displayCode ?? credential.name}
+                    {credential.renewalOpensOn ? ` · ${formatFullDate(credential.renewalOpensOn)}から更新可能` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button className="primary-action" type="button" onClick={openTranscriptImport}>
+              Transcriptを再インポート
+            </button>
+          </section>
+        ) : null}
+
         <section className="overview" aria-labelledby="overview-title">
           <div className="overview-copy">
             <h1
@@ -263,7 +325,7 @@ export default function App() {
               <div>
                 <p className="context-label">Get started</p>
                 <h2>まだ資格データがありません</h2>
-                <p>Microsoft Learn の Transcript PDF を取り込むと、期限と更新予定をここに表示します。</p>
+                <p>Microsoft Learn の Transcript PDF を取り込むか、資格を手動で追加してください。</p>
               </div>
             </section>
           ) : (
@@ -290,8 +352,8 @@ export default function App() {
             <div
               className="month-scale live-month-scale"
               style={{
-      gridTemplateColumns: months.map((month) => `minmax(0, ${month.days}fr)`).join(' '),
-    }}
+                gridTemplateColumns: months.map((month) => `minmax(0, ${month.days}fr)`).join(' '),
+              }}
             >
               {months.map((month) => <span key={month.id}>{month.label}</span>)}
             </div>
@@ -333,7 +395,9 @@ export default function App() {
                 <p className="context-label">{dashboard.credentials.length} credentials</p>
                 <h2 id="credentials-title">資格一覧</h2>
               </div>
-              <p>取得日・状態・期限を横並びで比較</p>
+              <button className="secondary-action" type="button" onClick={() => openManualEditor(null)}>
+                資格を追加
+              </button>
             </div>
 
             {dashboard.credentials.length > 0 ? (
@@ -345,36 +409,70 @@ export default function App() {
                       <th scope="col">取得日</th>
                       <th scope="col">状態</th>
                       <th scope="col">有効期限 / 次回</th>
+                      <th scope="col">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {dashboard.credentials.map((credential) => (
-                      <tr key={credential.id}>
-                        <td data-label="資格">
-                          <span className="credential-code">{credential.displayCode ?? '—'}</span>
-                          <strong>{credential.name}</strong>
-                        </td>
-                        <td data-label="取得日" className="date-cell">
-                          {formatFullDate(credential.firstEarnedOn)}
-                        </td>
-                        <td data-label="状態">
-                          <StatusText status={credential.status} />
-                        </td>
-                        <td data-label="有効期限 / 次回">
-                          <span className="date-cell">{formatFullDate(credential.currentExpiresOn)}</span>
-                          <small>{renewalNote(credential)}</small>
-                        </td>
-                      </tr>
-                    ))}
+                    {dashboard.credentials.map((credential) => {
+                      const stored = storedById.get(credential.id);
+                      return (
+                        <tr key={credential.id}>
+                          <td data-label="資格">
+                            <span className="credential-code">{credential.displayCode ?? '—'}</span>
+                            <strong>{credential.name}</strong>
+                          </td>
+                          <td data-label="取得日" className="date-cell">
+                            {formatFullDate(credential.firstEarnedOn)}
+                          </td>
+                          <td data-label="状態">
+                            <StatusText status={credential.status} />
+                          </td>
+                          <td data-label="有効期限 / 次回">
+                            <span className="date-cell">{formatFullDate(credential.currentExpiresOn)}</span>
+                            <small>{renewalNote(credential)}</small>
+                          </td>
+                          <td data-label="操作">
+                            {stored ? (
+                              <div className="credential-actions">
+                                <button type="button" onClick={() => openManualEditor(stored)}>修正</button>
+                                <button type="button" onClick={() => setCredentialArchived(stored.id, true)}>アーカイブ</button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             ) : (
               <div className="register-empty">
                 <strong>登録済みの資格はありません</strong>
-                <span>「資格を取り込む」からTranscript PDFを選択してください。</span>
+                <span>Transcript PDFを取り込むか、資格を手動で追加してください。</span>
               </div>
             )}
+
+            {archivedCredentials.length > 0 ? (
+              <details className="archived-credentials">
+                <summary>アーカイブ済み {archivedCredentials.length}件</summary>
+                <ul>
+                  {archivedCredentials.map((credential) => {
+                    const definition = getCredentialDefinition(credential.credentialDefinitionId);
+                    return (
+                      <li key={`archived-${credential.id}`}>
+                        <div>
+                          <strong>{definition?.displayCode ?? 'Credential'}</strong>
+                          <span>{definition?.canonicalTitle ?? credential.sourceTitle}</span>
+                        </div>
+                        <button type="button" onClick={() => setCredentialArchived(credential.id, false)}>
+                          元に戻す
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            ) : null}
           </section>
 
           <aside className="side-column" aria-label="今月と予定">
@@ -451,6 +549,12 @@ export default function App() {
         <span>Browser-local data · Microsoft Learn PDF import</span>
         <span>Microsoft Credentials Tracker</span>
       </footer>
+
+      <ManualCredentialDialog
+        open={manualDialogOpen}
+        credential={editingCredential}
+        onClose={closeManualEditor}
+      />
     </div>
   );
 }
