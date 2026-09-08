@@ -1,80 +1,170 @@
 name: Pages publish
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-  pull_request_target:
-    types: [closed]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pages-site-publish
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  publish-production:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
-    permissions:
-      actions: read
-      contents: write
-      issues: write
-      pull-requests: write
-      pages: write
-      id-token: write
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
-    with:
-      operation: publish
-      publish_target: production
-      source_run_id: ${{ github.event.workflow_run.id }}
-      source_sha: ${{ github.event.workflow_run.head_sha }}
-      pr_number: 0
-      production_branch: main
-      validated_workflow_name: CI
-      expect_review_images: true
-
   publish-preview:
+    name: Publish PR preview
     if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.pull_requests[0].number > 0
-    permissions:
-      actions: read
-      contents: write
-      issues: write
-      pull-requests: write
-      pages: write
-      id-token: write
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
-    with:
-      operation: publish
-      publish_target: preview
-      source_run_id: ${{ github.event.workflow_run.id }}
-      source_sha: ${{ github.event.workflow_run.head_sha }}
-      pr_number: ${{ github.event.workflow_run.pull_requests[0].number }}
-      production_branch: main
-      validated_workflow_name: CI
-      expect_review_images: true
-
-  cleanup-preview:
-    if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
       issues: write
       pull-requests: write
       pages: write
       id-token: write
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@a0c5ab5f4757131c7e1703eeeff69e0b2540b505
-    with:
-      operation: cleanup
-      publish_target: preview
-      pr_number: ${{ github.event.pull_request.number }}
-      expect_review_images: true
+    environment:
+      name: github-pages-preview
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.pull_request.number }}/
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve preview target
+        id: target
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          echo "base=/ms-credentials-tracker/pr-${PR_NUMBER}/" >> "$GITHUB_OUTPUT"
+          echo "path=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build preview
+        run: npm run build -- --base="${{ steps.target.outputs.base }}"
+
+      - name: Install Chromium for review images
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture review images
+        env:
+          PAGES_BASE_PATH: ${{ steps.target.outputs.base }}
+          PAGES_REVIEW_DIR: ${{ runner.temp }}/ui-preview
+        run: node scripts/capture-pr-preview.mjs
+
+      - name: Stage persistent Pages content
+        id: stage
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_PATH: ${{ steps.target.outputs.path }}
+          REVIEW_DIR: ${{ runner.temp }}/ui-preview
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish_dir="${RUNNER_TEMP}/pages-content"
+          deploy_dir="${RUNNER_TEMP}/pages-deploy"
+
+          if git ls-remote --exit-code "$remote" refs/heads/pages-content >/dev/null 2>&1; then
+            git clone --depth 1 --branch pages-content "$remote" "$publish_dir"
+          else
+            mkdir -p "$publish_dir"
+            git -C "$publish_dir" init -b pages-content
+          fi
+
+          git -C "$publish_dir" config user.name 'github-actions[bot]'
+          git -C "$publish_dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          rm -rf "$publish_dir/$TARGET_PATH"
+          mkdir -p "$publish_dir/$TARGET_PATH"
+          cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/$TARGET_PATH/"
+          mkdir -p "$publish_dir/$TARGET_PATH/review"
+          cp -a "$REVIEW_DIR/." "$publish_dir/$TARGET_PATH/review/"
+
+          if [[ ! -f "$publish_dir/index.html" ]]; then
+            printf '%s\n' '<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MS Credentials Tracker previews</title><body><main><h1>MS Credentials Tracker previews</h1></main></body></html>' > "$publish_dir/index.html"
+          fi
+
+          touch "$publish_dir/.nojekyll"
+          git -C "$publish_dir" add -A
+          if ! git -C "$publish_dir" diff --cached --quiet; then
+            git -C "$publish_dir" commit -m "chore(pages): publish ${TARGET_PATH}"
+            git -C "$publish_dir" push "$remote" HEAD:pages-content
+          fi
+
+          rm -rf "$deploy_dir"
+          mkdir -p "$deploy_dir"
+          rsync -a --exclude=.git "$publish_dir/" "$deploy_dir/"
+          echo "deploy_dir=$deploy_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ steps.stage.outputs.deploy_dir }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+      - name: Upsert PR preview comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          marker='<!-- ms-credentials-ui-preview -->'
+          short_sha="${HEAD_SHA:0:7}"
+          preview_base="https://${REPO_OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}"
+          body=$(cat <<EOF
+          ${marker}
+          ## UI preview
+
+          [Open interactive preview](${preview_base}/)
+
+          **Mobile · 390px**
+
+          ![Mobile preview](${preview_base}/review/mobile.png?v=${HEAD_SHA})
+
+          <details>
+          <summary>Desktop · 1440px</summary>
+
+          ![Desktop preview](${preview_base}/review/desktop.png?v=${HEAD_SHA})
+          </details>
+
+          <details>
+          <summary>Narrow · 320px</summary>
+
+          ![Narrow preview](${preview_base}/review/narrow.png?v=${HEAD_SHA})
+          </details>
+
+          Updated for ${short_sha}.
+          EOF
+          )
+
+          comment_id=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | contains("<!-- ms-credentials-ui-preview -->")) | .id' | head -n 1)
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+          fi
