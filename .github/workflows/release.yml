@@ -8,17 +8,25 @@ on:
 permissions:
   contents: write
 
+env:
+  # Set to 'true' for a GitHub prerelease milestone.
+  PRERELEASE: 'false'
+
 jobs:
   release:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    env:
+      VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
       - name: Checkout validated main commit
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.VALIDATED_SHA }}
           fetch-depth: 2
 
       - name: Detect explicit version change
@@ -56,8 +64,8 @@ jobs:
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish)"
-            if [[ "$existing" == "$GITHUB_SHA" || "$existing" == "main" ]]; then
-              echo "Release $TAG already exists; nothing to do."
+            if [[ "$existing" == "$VALIDATED_SHA" ]]; then
+              echo "Release $TAG already exists at validated SHA; nothing to do."
               exit 0
             fi
             echo "Release $TAG already exists with unexpected target: $existing" >&2
@@ -65,8 +73,8 @@ jobs:
           fi
 
           remote_sha="$(git ls-remote origin "refs/tags/$TAG" | awk '{print $1}')"
-          if [[ -n "$remote_sha" && "$remote_sha" != "$GITHUB_SHA" ]]; then
-            echo "Tag $TAG already points to $remote_sha instead of $GITHUB_SHA" >&2
+          if [[ -n "$remote_sha" && "$remote_sha" != "$VALIDATED_SHA" ]]; then
+            echo "Tag $TAG already points to $remote_sha instead of $VALIDATED_SHA" >&2
             exit 1
           fi
 
@@ -83,8 +91,14 @@ jobs:
             exit 0
           fi
 
+          prerelease_args=()
+          if [[ "$PRERELEASE" == 'true' ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target "$VALIDATED_SHA" \
             --title "$TAG" \
-            --generate-notes
+            --generate-notes \
+            "${prerelease_args[@]}"
