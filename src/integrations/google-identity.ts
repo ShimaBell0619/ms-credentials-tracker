@@ -1,4 +1,5 @@
 import { GOOGLE_CALENDAR_SCOPE } from './google-calendar.ts';
+import { GOOGLE_CALENDAR_LIST_READONLY_SCOPE } from './google-calendar-discovery.ts';
 
 const GOOGLE_IDENTITY_SCRIPT_ID = 'google-identity-services';
 const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
@@ -87,7 +88,9 @@ export function requestGoogleCalendarAccessToken(clientId: string): Promise<stri
   return new Promise<string>((resolve, reject) => {
     const client = oauth2.initTokenClient({
       client_id: clientId,
-      scope: GOOGLE_CALENDAR_SCOPE,
+      // app.created keeps event access narrow; calendarlist.readonly is only used to
+      // rediscover the same dedicated calendar when another browser origin has no local ID.
+      scope: [GOOGLE_CALENDAR_SCOPE, GOOGLE_CALENDAR_LIST_READONLY_SCOPE].join(' '),
       callback: (response) => {
         if (response.error || !response.access_token) {
           reject(new GoogleAuthorizationError('oauth'));

@@ -172,6 +172,78 @@
   font-size: 11px;
 }
 
+.google-calendar-host > .section-heading,
+.google-calendar-host > .calendar {
+  display: none;
+}
+
+.google-calendar-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.google-calendar-heading {
+  margin-bottom: 0;
+}
+
+.google-calendar-state {
+  color: var(--azure);
+  font: 700 10px/1 Consolas, "SFMono-Regular", monospace;
+}
+
+.google-calendar-frame-wrap {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  overflow: hidden;
+}
+
+.google-calendar-frame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 0;
+  background: #fff;
+}
+
+.google-calendar-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.google-calendar-empty {
+  display: grid;
+  gap: 7px;
+  padding: 22px 18px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-alt);
+}
+
+.google-calendar-empty strong {
+  font-size: 12px;
+}
+
+.google-calendar-empty span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1040px) {
+  .google-calendar-frame {
+    height: 470px;
+  }
+}
+
+@media (max-width: 720px) {
+  .google-calendar-frame {
+    height: 500px;
+  }
+}
+
 @media (max-width: 620px) {
   .calendar-sync-header,
   .calendar-sync-body {
@@ -192,5 +264,9 @@
 @media (max-width: 390px) {
   .header-meta .calendar-trigger {
     padding-inline: 8px;
+  }
+
+  .google-calendar-frame {
+    height: 460px;
   }
 }
