@@ -1,0 +1,29 @@
+name: Cleanup Staging
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLOSED_PR_NUMBER: ${{ github.event.pull_request.number }}
+      CLOSED_PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      CLOSED_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      STAGING_URL: https://staging.credentials.shimabell.dev
+    steps:
+      - name: Checkout trusted main automation
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Reset Staging only when it still points to the closed PR
+        run: node scripts/staging-slot.mjs cleanup

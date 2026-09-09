@@ -19,9 +19,11 @@ The scope is intentionally narrower than full Calendar access. It allows the app
 2. Enable **Google Calendar API**.
 3. Configure the Google Auth Platform / OAuth consent screen.
 4. Create an OAuth 2.0 Client ID with application type **Web application**.
-5. Add the canonical Production origin to **Authorized JavaScript origins**: `https://credentials.shimabell.dev`.
+5. Add both canonical exact origins to **Authorized JavaScript origins**:
+   - Production: `https://credentials.shimabell.dev`
+   - Fixed Staging: `https://staging.credentials.shimabell.dev`
 6. If the OAuth app is in Testing, add the intended Google account as a test user.
-7. Add the public Client ID to the Vercel project as `VITE_GOOGLE_CLIENT_ID` for Production.
+7. Add the public Client ID to the Vercel project as `VITE_GOOGLE_CLIENT_ID`. Production and Fixed Staging intentionally use the same OAuth Web Client / Client ID.
 
 The Client ID is public browser configuration, not a client secret. Never add a Google OAuth client secret to this SPA.
 
@@ -33,13 +35,15 @@ VITE_GOOGLE_CLIENT_ID=<web-client-id>.apps.googleusercontent.com
 
 Do not commit `.env.local`.
 
-### Preview deployment constraint
+### Preview deployment constraint and Fixed Staging
 
 Vercel creates a distinct Preview origin for non-production branches and Pull Requests. Google OAuth **Authorized JavaScript origins require exact origins and do not allow wildcard hostnames**. Therefore arbitrary Vercel Preview URLs cannot all be authorized once with `*.vercel.app`.
 
-Use Vercel Preview Deployments for UI, responsive, import, projection, and other non-OAuth review by default. Google Calendar authorization works on Production through `https://credentials.shimabell.dev` after that origin is registered, and on a specific Preview only if that exact Preview origin is explicitly added to the OAuth client. Do not weaken the OAuth model or add a client secret to work around this platform constraint.
+Use normal Vercel Preview Deployments for UI, responsive, import, projection, and other non-OAuth review by default. When a PR specifically needs OAuth or another exact-Origin integration check, explicitly place that PR HEAD in the shared `staging` slot and test through `https://staging.credentials.shimabell.dev`.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for environment ownership and the Vercel deployment flow.
+Do not register every generated Preview URL, weaken the OAuth model, or add a client secret to work around the platform constraint. The `staging` branch is a mutable one-PR verification slot rather than a release branch; see [STAGING.md](STAGING.md) for deployment and cleanup behavior.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the broader environment ownership and Vercel deployment flow.
 
 ## Calendar ownership and reconciliation
 

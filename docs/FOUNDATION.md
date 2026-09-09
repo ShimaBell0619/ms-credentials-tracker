@@ -26,5 +26,6 @@
 - Browser-rendered E2E remains enabled in the shared Web CI because it is part of this application's quality contract.
 - Azure OIDC is not an active application deployment/runtime profile. The owner-wide Flexible FIC was validated separately during Foundation development, but this repository does not retain a privileged Azure workflow after that validation completed.
 - Vercel deployment status and Foundation CI remain independently visible; Vercel Git Integration may begin Production deployment before post-merge CI for the exact Production SHA finishes.
+- This repository is the proving consumer for a fixed-Origin Staging slot. The app-specific Staging workflows move only the `staging` Git ref and leave hosting to Vercel Git Integration; this profile is not yet part of the adopted Foundation v0.4.0 contract and should be generalized only after the consumer implementation is proven.
 
 Copied Foundation rules/templates do not update automatically. Foundation upgrades must review the Foundation changelog/diff, preserve approved app-specific deviations, update copied contracts deliberately, update reusable-workflow SHAs only after review, and refresh this provenance record.
