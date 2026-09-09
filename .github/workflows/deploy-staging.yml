@@ -1,0 +1,39 @@
+name: Deploy PR to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Open same-repository PR number to place in the fixed Staging slot'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: fixed-staging-deploy-slot
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+      STAGING_URL: https://staging.credentials.shimabell.dev
+      STAGING_WORKFLOW_FILE: deploy-staging.yml
+    steps:
+      - name: Checkout trusted main automation
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Move fixed Staging slot to PR HEAD
+        run: node scripts/staging-slot.mjs deploy

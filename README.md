@@ -62,6 +62,7 @@ npm run test:e2e
 - [Credential domain model](docs/DOMAIN.md)
 - [Google Calendar integration](docs/GOOGLE_CALENDAR.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
+- [Fixed Staging slot](docs/STAGING.md)
 - [Foundation provenance](docs/FOUNDATION.md)
 
 ## License
