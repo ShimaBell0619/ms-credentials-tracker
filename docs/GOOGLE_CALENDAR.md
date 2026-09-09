@@ -23,7 +23,10 @@ The scope is intentionally narrower than full Calendar access. It allows the app
    - Production: `https://credentials.shimabell.dev`
    - Fixed Staging: `https://staging.credentials.shimabell.dev`
 6. If the OAuth app is in Testing, add the intended Google account as a test user.
-7. Add the public Client ID to the Vercel project as `VITE_GOOGLE_CLIENT_ID`. Production and Fixed Staging intentionally use the same OAuth Web Client / Client ID.
+7. Add the public Client ID to the Vercel project as `VITE_GOOGLE_CLIENT_ID` for Production.
+8. Make the same `VITE_GOOGLE_CLIENT_ID` value available to the Vercel Preview environment for Git branch `staging`. Prefer branch-specific Preview scoping rather than changing the normal PR Preview contract.
+
+Production and Fixed Staging intentionally use the same OAuth Web Client / Client ID. A `staging` branch deployment is a Vercel Preview deployment, so a Production-only environment variable does not configure Staging.
 
 The Client ID is public browser configuration, not a client secret. Never add a Google OAuth client secret to this SPA.
 

@@ -83,6 +83,8 @@ A maintainer explicitly runs **Deploy PR to Staging** from the Actions tab and s
 
 When a PR closes or merges, cleanup resets `staging` to the current `main` HEAD only if `staging` still points to that closed PR's HEAD SHA. Ref updates use `git push --force-with-lease`, so a concurrent or newer Staging selection cannot be overwritten by a stale cleanup check.
 
+Because `staging` is not the Production branch, Vercel treats it as a Preview deployment. Any build-time configuration needed by Staging must therefore be available to Preview for the `staging` branch.
+
 See [STAGING.md](STAGING.md) for the complete operating, security, race-handling, and external-configuration contract.
 
 ## Vite build configuration
@@ -108,7 +110,8 @@ Keep Vercel configuration minimal; do not move normal Vite behavior into `vercel
 
 | Configuration | Owner / location |
 | --- | --- |
-| `VITE_GOOGLE_CLIENT_ID` for deployed builds | Vercel Project Environment Variables |
+| `VITE_GOOGLE_CLIENT_ID` for Production | Vercel Project Environment Variables: Production |
+| `VITE_GOOGLE_CLIENT_ID` for Fixed Staging | Vercel Project Environment Variables: Preview scoped to Git branch `staging` |
 | `VITE_GOOGLE_CLIENT_ID` for local development | `.env.local` |
 | Google OAuth Authorized JavaScript origins | Google Cloud OAuth Web Client |
 | Production domain | Vercel Project domain configuration + DNS provider |
@@ -120,7 +123,7 @@ Keep Vercel configuration minimal; do not move normal Vite behavior into `vercel
 
 `VITE_GOOGLE_CLIENT_ID` is a browser-visible OAuth Client ID. It is not a client secret. Never put a Google OAuth client secret into this SPA.
 
-Production and Fixed Staging intentionally use the same Google OAuth Web Client / Client ID.
+Production and Fixed Staging intentionally use the same Google OAuth Web Client / Client ID. The same value must be configured in the two relevant Vercel environments; do not create a separate Staging OAuth client.
 
 ## Environment-variable changes
 

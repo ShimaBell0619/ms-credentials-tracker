@@ -107,6 +107,14 @@ Normal Vercel PR Preview Deployments remain enabled and unchanged.
 
 The repository workflow does not call the Vercel deployment API. A Git push to `staging` remains the deployment trigger, preserving Vercel Git Integration as the hosting owner.
 
+### Staging environment variables
+
+A deployment from the `staging` Git branch is a Vercel **Preview** deployment, even though it has a stable Branch Domain. Production-only Vercel environment variables are therefore not sufficient for Staging.
+
+`VITE_GOOGLE_CLIENT_ID` must be available to the `staging` Preview deployment. Prefer a Preview environment variable scoped specifically to Git branch `staging`, using the same Client ID value as Production. This keeps the fixed-Origin integration configuration explicit without changing normal PR Preview behavior.
+
+After adding or changing the branch-scoped environment variable, create a new `staging` deployment so Vite rebuilds with the value.
+
 ## Google OAuth configuration
 
 Production and Staging intentionally use the same Google OAuth Web Client / Client ID.
@@ -124,9 +132,10 @@ The regular Vercel PR Preview remains useful for non-OAuth review even though it
 
 ## External setup checklist
 
-Repository-side automation can be merged independently, but Fixed Staging is not usable at its canonical URL until both external settings are complete:
+Repository-side automation can be merged independently, but Fixed Staging is not usable for Google OAuth at its canonical URL until all external settings are complete:
 
-- Vercel: add `staging.credentials.shimabell.dev` to the project and associate it with Git branch `staging`.
+- Vercel domain: add `staging.credentials.shimabell.dev` to the project and associate it with Git branch `staging`.
+- Vercel environment variable: make `VITE_GOOGLE_CLIENT_ID` available to Preview deployments for Git branch `staging`, using the same Client ID as Production.
 - Google Cloud: add `https://staging.credentials.shimabell.dev` to the existing OAuth Web Client's Authorized JavaScript origins while preserving `https://credentials.shimabell.dev`.
 
 No separate Staging OAuth Client ID is required.
