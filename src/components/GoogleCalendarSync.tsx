@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { localDateToIso } from '../domain/credential-projection.ts';
+import { findReusableGoogleCalendarId } from '../integrations/google-calendar-discovery.ts';
 import {
   buildGoogleCalendarDesiredEvents,
   fingerprintGoogleCalendarDesiredEvents,
@@ -40,9 +41,29 @@ function formatLastSynced(value: string | null): string {
   }).format(date);
 }
 
+function buildGoogleCalendarEmbedUrl(calendarId: string | null): string | null {
+  if (!calendarId) return null;
+
+  const params = new URLSearchParams({
+    src: calendarId,
+    ctz: 'Asia/Tokyo',
+    mode: 'MONTH',
+    showTitle: '0',
+    showNav: '1',
+    showDate: '1',
+    showPrint: '0',
+    showTabs: '0',
+    showCalendars: '0',
+    showTz: '0',
+  });
+
+  return `https://calendar.google.com/calendar/embed?${params.toString()}`;
+}
+
 export function GoogleCalendarSync() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const [calendarPortalTarget, setCalendarPortalTarget] = useState<HTMLElement | null>(null);
   const [credentials, setCredentials] = useState(() => loadStoredCredentials());
   const [integration, setIntegration] = useState(() => loadGoogleCalendarIntegrationState());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,6 +84,10 @@ export function GoogleCalendarSync() {
     () => new Set(desiredEvents.map((event) => event.credentialId)).size,
     [desiredEvents],
   );
+  const embeddedCalendarUrl = useMemo(
+    () => buildGoogleCalendarEmbedUrl(integration.calendarId),
+    [integration.calendarId],
+  );
   const needsSync = integration.calendarId
     ? integration.lastDesiredFingerprint !== desiredFingerprint
     : desiredEvents.length > 0;
@@ -77,6 +102,26 @@ export function GoogleCalendarSync() {
 
   useEffect(() => {
     setPortalTarget(document.querySelector<HTMLElement>('.header-meta'));
+  }, []);
+
+  useEffect(() => {
+    const target = document.querySelector<HTMLElement>('.calendar-section');
+    if (!target) return;
+
+    const previousLabelledBy = target.getAttribute('aria-labelledby');
+    const previousLabel = target.getAttribute('aria-label');
+    target.classList.add('google-calendar-host');
+    target.removeAttribute('aria-labelledby');
+    target.setAttribute('aria-label', 'Googleカレンダー');
+    setCalendarPortalTarget(target);
+
+    return () => {
+      target.classList.remove('google-calendar-host');
+      if (previousLabelledBy) target.setAttribute('aria-labelledby', previousLabelledBy);
+      else target.removeAttribute('aria-labelledby');
+      if (previousLabel) target.setAttribute('aria-label', previousLabel);
+      else target.removeAttribute('aria-label');
+    };
   }, []);
 
   useEffect(() => {
@@ -113,10 +158,11 @@ export function GoogleCalendarSync() {
     try {
       const accessToken = await requestGoogleCalendarAccessToken(clientId);
       setSyncPhase('syncing');
+      const reusableCalendarId = await findReusableGoogleCalendarId(accessToken);
       const result = await syncGoogleCalendar(
         new GoogleCalendarRestApi(accessToken),
         desiredEvents,
-        integration.calendarId,
+        reusableCalendarId ?? integration.calendarId,
       );
       const nextState: GoogleCalendarIntegrationState = {
         version: 1,
@@ -182,9 +228,46 @@ export function GoogleCalendarSync() {
     </>
   );
 
+  const calendarPanel = (
+    <div className="google-calendar-panel">
+      <div className="section-heading compact-heading google-calendar-heading">
+        <div>
+          <p className="context-label">External calendar</p>
+          <h2>Googleカレンダー</h2>
+        </div>
+        <span className="google-calendar-state">
+          {integration.calendarId ? '同期済み' : '未同期'}
+        </span>
+      </div>
+
+      {embeddedCalendarUrl ? (
+        <>
+          <div className="google-calendar-frame-wrap">
+            <iframe
+              className="google-calendar-frame"
+              title="Microsoft Credentials Tracker Google Calendar"
+              src={embeddedCalendarUrl}
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+          <p className="google-calendar-note">
+            Google Calendar側のログイン状態を利用して表示します。
+          </p>
+        </>
+      ) : (
+        <div className="google-calendar-empty">
+          <strong>Googleカレンダーはまだ接続されていません</strong>
+          <span>画面上部の「Googleカレンダー」から同期すると、ここに予定を表示します。</span>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       {portalTarget ? createPortal(trigger, portalTarget) : null}
+      {calendarPortalTarget ? createPortal(calendarPanel, calendarPortalTarget) : null}
 
       <dialog
         ref={dialogRef}

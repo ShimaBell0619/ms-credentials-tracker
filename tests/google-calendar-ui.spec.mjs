@@ -38,7 +38,8 @@ for (const viewport of viewports) {
 
     const trigger = page.getByRole('button', { name: 'Googleカレンダー' });
     await expect(trigger).toBeVisible();
-    await expect(page.getByText('未同期', { exact: true })).toBeVisible();
+    await expect(page.getByRole('banner').getByText('未同期', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('今月と予定').getByText('未同期', { exact: true })).toBeVisible();
     await trigger.click();
 
     const dialog = page.getByRole('dialog', { name: 'Googleカレンダー同期' });
@@ -78,5 +79,5 @@ test('marks cleanup as unsynchronized when the last desired Calendar events disa
   await page.goto('/');
 
   await expect(page.getByRole('button', { name: 'カレンダーを更新' })).toBeVisible();
-  await expect(page.getByText('未同期', { exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText('未同期', { exact: true })).toBeVisible();
 });
