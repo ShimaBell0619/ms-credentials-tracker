@@ -1,33 +1,68 @@
 @import "tailwindcss";
 
-@theme {
+:root {
+  color-scheme: light;
+
+  /* Runtime semantic values. Product intent lives here; Tailwind aliases are wired below. */
+  --app-color-background: oklch(0.9759 0.0029 264.5);
+  --app-color-surface: oklch(1 0 0);
+  --app-color-surface-muted: oklch(0.9842 0.0034 247.9);
+  --app-color-foreground: oklch(0.2776 0.0341 255.8);
+  --app-color-muted: oklch(0.5444 0.035 265.1);
+  --app-color-border: oklch(0.9271 0.0075 260.7);
+  --app-color-border-strong: oklch(0.8715 0.0123 259.8);
+  --app-color-accent: oklch(0.5263 0.1493 251.6);
+  --app-color-accent-soft: oklch(0.9684 0.0134 241);
+  --app-color-action: oklch(0.5263 0.1493 251.6);
+  --app-color-focus: oklch(0.5263 0.1493 251.6);
+  --app-color-warning: oklch(0.5394 0.1562 43);
+  --app-color-warning-soft: oklch(0.9796 0.0158 73.7);
+  --app-color-success: oklch(0.4987 0.1168 157.1);
+  --app-color-success-soft: oklch(0.9788 0.0221 160.2);
+  --app-color-danger: oklch(0.5003 0.1821 29.5);
+  --app-color-danger-soft: oklch(0.9725 0.0119 23.7);
+  --app-color-status-neutral: oklch(0.4422 0.0355 257.8);
+  --app-color-overlay: oklch(0.2 0.02 255 / 35%);
+
+  --app-shadow-surface: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --app-shadow-popover: 0 20px 28px rgb(16 24 40 / 0.12), 0 8px 12px rgb(16 24 40 / 0.08);
+  --app-motion-fast: 150ms;
+  --app-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
   --font-sans: "Segoe UI Variable", "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
 
-  --color-background: #f6f7f9;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f8fafc;
-  --color-foreground: #1d2939;
-  --color-muted: #667085;
-  --color-border: #e4e7ec;
-  --color-border-strong: #d0d5dd;
-  --color-primary: #0f6cbd;
-  --color-primary-soft: #edf6fd;
-  --color-warning: #b54708;
-  --color-warning-soft: #fff7ed;
-  --color-success: #067647;
-  --color-success-soft: #ecfdf3;
-  --color-danger: #b42318;
-  --color-danger-soft: #fef3f2;
-  --color-slate-status: #475467;
+  --color-background: var(--app-color-background);
+  --color-surface: var(--app-color-surface);
+  --color-surface-muted: var(--app-color-surface-muted);
+  --color-foreground: var(--app-color-foreground);
+  --color-muted: var(--app-color-muted);
+  --color-border: var(--app-color-border);
+  --color-border-strong: var(--app-color-border-strong);
+  --color-primary: var(--app-color-accent);
+  --color-primary-soft: var(--app-color-accent-soft);
+  --color-action: var(--app-color-action);
+  --color-focus: var(--app-color-focus);
+  --color-warning: var(--app-color-warning);
+  --color-warning-soft: var(--app-color-warning-soft);
+  --color-success: var(--app-color-success);
+  --color-success-soft: var(--app-color-success-soft);
+  --color-danger: var(--app-color-danger);
+  --color-danger-soft: var(--app-color-danger-soft);
+  --color-status-neutral: var(--app-color-status-neutral);
+  --color-overlay: var(--app-color-overlay);
 
-  --shadow-surface: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
-  --shadow-popover: 0 20px 28px rgb(16 24 40 / 0.12), 0 8px 12px rgb(16 24 40 / 0.08);
+  /* Compatibility alias for existing product code; new code should use status-neutral. */
+  --color-slate-status: var(--app-color-status-neutral);
+
+  --shadow-surface: var(--app-shadow-surface);
+  --shadow-popover: var(--app-shadow-popover);
 }
 
 @layer base {
   :root {
-    color-scheme: light;
     font-family: var(--font-sans);
     color: var(--color-foreground);
     background: var(--color-background);
@@ -75,8 +110,29 @@
 
 .skip-link:focus {
   transform: translateY(0);
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.dialog-backdrop {
+  transition: opacity var(--app-motion-fast) var(--app-motion-ease-out);
+}
+
+.dialog-backdrop[data-starting-style],
+.dialog-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.dialog-popup {
+  transition:
+    opacity var(--app-motion-fast) var(--app-motion-ease-out),
+    scale var(--app-motion-fast) var(--app-motion-ease-out);
+}
+
+.dialog-popup[data-starting-style],
+.dialog-popup[data-ending-style] {
+  opacity: 0;
+  scale: 0.98;
 }
 
 .timeline-visual {
@@ -162,6 +218,25 @@
 
 .timeline-pin-deadline {
   background: var(--color-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .dialog-backdrop,
+  .dialog-popup {
+    transition: none;
+  }
+
+  .dialog-backdrop[data-starting-style],
+  .dialog-backdrop[data-ending-style],
+  .dialog-popup[data-starting-style],
+  .dialog-popup[data-ending-style] {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 @media (max-width: 390px) {
