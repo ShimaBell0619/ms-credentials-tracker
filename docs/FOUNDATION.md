@@ -1,15 +1,23 @@
 # Foundation provenance
 
-- Adopted Foundation version: 0.7.2
-- Foundation commit: `976421d0a88e059e60cfb71b86542d27640ae151`
+- Adopted Foundation version: 0.8.0
+- Foundation commit: `a187a39544250c6478dcd037c1c8f47172120667`
 - Reusable workflow commit: `c968b8af1f666d8f6024cd9e292c91cbf631fefe`
 - Adopted on: 2026-09-11
 
-The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.7.2 does not change the reusable Web CI contract. v0.7.2 hardens the copied Fixed Staging publisher and release-preparation discipline, so those changes are adopted deliberately without moving an unrelated workflow SHA solely for version conformity.
+The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.8.0 does not change the reusable Web CI contract relative to the previously adopted v0.7.2 state. v0.8.0 retires GitHub Pages from the active Foundation and makes Vercel Git Integration the default hosting profile; this consumer already uses that Vercel model. The copied Fixed Staging workflows also remain unchanged because v0.8.0 does not change that profile. Stable consumer code is not migrated solely for version conformity.
+
+## v0.8.0 adoption impact
+
+- GitHub Pages is no longer an active Foundation capability; this repository already completed its migration to Vercel, so no Pages compatibility or removal work is required here.
+- Vercel Git Integration is the Foundation default hosting/deployment profile and matches this repository's existing deployment ownership.
+- Existing stable domains remain application-owned: Production is `https://credentials.shimabell.dev`, and Fixed Staging is `https://staging.credentials.shimabell.dev`.
+- Ordinary Pull Request previews continue to use Vercel-provided Preview URLs; the fixed Staging domain is reserved for exact-Origin verification.
+- No application runtime, product behavior, reusable Web CI pin, Fixed Staging workflow, or Application Release workflow changes are part of this adoption.
 
 ## Adopted AI implementation profile
 
-- Normal Chat-based material changes use the v0.7.2 context-routed implementation profile.
+- Normal Chat-based material changes use the v0.8.0 context-routed implementation profile.
 - `AGENTS.md` owns the repository-specific Context Routing index; matching routes are additive and point to the actual normative specialist documents in this repository.
 - Repository contracts remain the source of truth. The Repository Context Packet is session-local working state only and must not become a duplicate permanent context document.
 - Before implementation, extract change-specific Design Intent and map material contracts / Acceptance Criteria to implementation surfaces and validation evidence.
@@ -21,7 +29,7 @@ The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit beca
 
 ## UI-standard trial boundary
 
-PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.2. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.7.2 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
+PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.8.0. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.8.0 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
 
 ## Adopted optional profiles
 
@@ -40,7 +48,7 @@ PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.2
 - `staging` remains a mutable one-PR verification slot and is not a merge, release, or history branch.
 - Cleanup uses the closed PR HEAD SHA as slot ownership evidence, so a stale close event cannot clear a newer occupant and PR retargeting does not strand the slot.
 - Vercel Git Integration remains the deployment owner after GitHub moves the `staging` ref.
-- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the Foundation v0.7.2 correction.
+- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the correction introduced in Foundation v0.7.2 and retained in v0.8.0.
 
 ### Application GitHub Releases
 
