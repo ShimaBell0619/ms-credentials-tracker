@@ -1,15 +1,15 @@
 # Foundation provenance
 
-- Adopted Foundation version: 0.7.1
-- Foundation commit: `4e8d704865b429cfa8d94631d34f93cb3b4ad44c`
+- Adopted Foundation version: 0.7.2
+- Foundation commit: `976421d0a88e059e60cfb71b86542d27640ae151`
 - Reusable workflow commit: `c968b8af1f666d8f6024cd9e292c91cbf631fefe`
 - Adopted on: 2026-09-11
 
-The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.7.1 refines Chat implementation guidance only and does not change the reusable workflow contract. Do not move a workflow SHA solely for version conformity.
+The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.7.2 does not change the reusable Web CI contract. v0.7.2 hardens the copied Fixed Staging publisher and release-preparation discipline, so those changes are adopted deliberately without moving an unrelated workflow SHA solely for version conformity.
 
 ## Adopted AI implementation profile
 
-- Normal Chat-based material changes use the v0.7.1 context-routed implementation profile.
+- Normal Chat-based material changes use the v0.7.2 context-routed implementation profile.
 - `AGENTS.md` owns the repository-specific Context Routing index; matching routes are additive and point to the actual normative specialist documents in this repository.
 - Repository contracts remain the source of truth. The Repository Context Packet is session-local working state only and must not become a duplicate permanent context document.
 - Before implementation, extract change-specific Design Intent and map material contracts / Acceptance Criteria to implementation surfaces and validation evidence.
@@ -21,7 +21,7 @@ The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit beca
 
 ## UI-standard trial boundary
 
-PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.1. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.7.1 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
+PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.2. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.7.2 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
 
 ## Adopted optional profiles
 
@@ -40,6 +40,7 @@ PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.1
 - `staging` remains a mutable one-PR verification slot and is not a merge, release, or history branch.
 - Cleanup uses the closed PR HEAD SHA as slot ownership evidence, so a stale close event cannot clear a newer occupant and PR retargeting does not strand the slot.
 - Vercel Git Integration remains the deployment owner after GitHub moves the `staging` ref.
+- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the Foundation v0.7.2 correction.
 
 ### Application GitHub Releases
 
