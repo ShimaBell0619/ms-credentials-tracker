@@ -153,7 +153,7 @@ export function GoogleCalendarSync() {
     return () => {
       cancelled = true;
     };
-  }, [clientId, dialogOpen]);
+  }, [dialogOpen]);
 
   async function synchronize() {
     if (!clientId || authReadiness !== 'ready') return;

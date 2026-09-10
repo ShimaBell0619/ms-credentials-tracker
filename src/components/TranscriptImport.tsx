@@ -260,6 +260,7 @@ export function TranscriptImport() {
                 {result.credentials.map((candidate, index) => {
                   const key = candidateKey(candidate, index);
                   const mappedDefinitionId = resolutionMap[key] ?? '';
+                  const resolutionId = `credential-resolution-${index}`;
                   return (
                     <li className="py-4" key={key}>
                       <div className="candidate-title flex items-start justify-between gap-4">
@@ -286,9 +287,12 @@ export function TranscriptImport() {
                       </dl>
 
                       {candidate.matchStatus === 'unresolved' ? (
-                        <label className="mt-4 grid gap-2 border-t border-border pt-4">
-                          <span className="text-sm font-semibold text-foreground">この資格を手動で照合</span>
+                        <div className="mt-4 grid gap-2 border-t border-border pt-4">
+                          <label className="text-sm font-semibold text-foreground" htmlFor={resolutionId}>
+                            この資格を手動で照合
+                          </label>
                           <NativeSelect
+                            id={resolutionId}
                             value={mappedDefinitionId}
                             onChange={(event) =>
                               setResolutionMap((current) => ({
@@ -309,7 +313,7 @@ export function TranscriptImport() {
                           <small className="text-xs leading-5 text-muted">
                             タイトルが似ているだけでは自動照合しません。内容を確認して選択してください。
                           </small>
-                        </label>
+                        </div>
                       ) : null}
                     </li>
                   );

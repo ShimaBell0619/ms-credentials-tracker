@@ -3,6 +3,11 @@
   "files": {
     "includes": ["**", "!dist", "!node_modules", "!playwright-report", "!test-results"]
   },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
