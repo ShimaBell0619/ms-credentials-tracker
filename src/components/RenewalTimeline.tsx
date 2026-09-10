@@ -89,7 +89,7 @@ export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimel
               <span key={month.id}>{month.label}</span>
             ))}
           </div>
-          <div className="timeline-rail">
+          <div className="timeline-rail live-timeline-rail">
             {events.map((event) => (
               <div
                 className={`timeline-pin timeline-pin-${event.kind}`}

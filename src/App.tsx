@@ -87,7 +87,7 @@ export default function App() {
 
       <main id="main-content" className="mx-auto w-full max-w-[1380px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         {refreshState.shouldPrompt ? (
-          <section className="mb-7 flex flex-col gap-4 rounded-xl border border-warning/25 bg-warning-soft px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5" aria-labelledby="freshness-title">
+          <section className="freshness-banner mb-7 flex flex-col gap-4 rounded-xl border border-warning/25 bg-warning-soft px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5" aria-labelledby="freshness-title">
             <div className="min-w-0">
               <p className="text-xs font-semibold text-warning">Transcript refresh</p>
               <h2 id="freshness-title" className="mt-1 text-base font-semibold text-foreground">資格情報を確認してください</h2>
@@ -133,7 +133,7 @@ export default function App() {
         <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
           <CredentialRegister credentials={dashboard.credentials} />
 
-          <aside className="grid min-w-0 gap-6" aria-label="カレンダーと直近の予定">
+          <aside className="grid min-w-0 gap-6" aria-label="今月と予定">
             <CredentialCalendar referenceDate={referenceDate} events={dashboard.scheduleEvents} />
             <UpcomingRenewals events={dashboard.scheduleEvents} />
           </aside>
