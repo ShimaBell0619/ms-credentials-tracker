@@ -12,13 +12,32 @@ interface PrimaryCredentialStateProps {
   nextDeadline: CredentialProjection | null;
 }
 
+function ExpiredNotice({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <div className="flex flex-col gap-2 border-l-2 border-danger bg-danger-soft/45 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-foreground">
+        <strong className="font-semibold text-danger">期限切れの資格が{count}件あります。</strong>
+        <span className="ml-1 text-muted">更新対象とは分けて確認してください。</span>
+      </span>
+      <a className="shrink-0 text-xs font-semibold text-danger no-underline hover:underline" href="#credentials">
+        資格一覧で確認
+      </a>
+    </div>
+  );
+}
+
 export function PrimaryCredentialState({
   credentials,
   nextDeadline,
 }: PrimaryCredentialStateProps) {
   const expired = credentials.filter((credential) => credential.status === 'expired');
+  const renewalAvailable = credentials.find(
+    (credential) => credential.status === 'renewalAvailable' && credential.currentExpiresOn,
+  );
+  const credential = renewalAvailable ?? nextDeadline;
 
-  if (expired.length > 0) {
+  if (!credential?.currentExpiresOn && expired.length > 0) {
     const firstExpired = expired[0];
     return (
       <section
@@ -47,11 +66,6 @@ export function PrimaryCredentialState({
     );
   }
 
-  const renewalAvailable = credentials.find(
-    (credential) => credential.status === 'renewalAvailable' && credential.currentExpiresOn,
-  );
-  const credential = renewalAvailable ?? nextDeadline;
-
   if (!credential?.currentExpiresOn) {
     const allNonExpiring = credentials.every((item) => item.status === 'nonExpiring');
     return (
@@ -78,63 +92,66 @@ export function PrimaryCredentialState({
 
   const canRenew = credential.status === 'renewalAvailable';
   return (
-    <section
-      className="overflow-hidden rounded-xl border border-border bg-surface shadow-surface"
-      aria-label="次に対応が必要な資格"
-    >
-      <div
-        className={
-          canRenew
-            ? 'grid border-l-4 border-l-primary md:grid-cols-[150px_minmax(0,1fr)_120px]'
-            : 'grid border-l-4 border-l-warning md:grid-cols-[150px_minmax(0,1fr)_120px]'
-        }
+    <div className="grid gap-3">
+      <section
+        className="overflow-hidden rounded-xl border border-border bg-surface shadow-surface"
+        aria-label="次に対応が必要な資格"
       >
         <div
           className={
             canRenew
-              ? 'flex flex-col justify-center border-b border-border bg-primary-soft/70 px-5 py-5 md:border-b-0 md:border-r'
-              : 'flex flex-col justify-center border-b border-border bg-warning-soft/60 px-5 py-5 md:border-b-0 md:border-r'
+              ? 'grid border-l-4 border-l-primary md:grid-cols-[150px_minmax(0,1fr)_120px]'
+              : 'grid border-l-4 border-l-warning md:grid-cols-[150px_minmax(0,1fr)_120px]'
           }
         >
-          <span className={canRenew ? 'text-xs font-semibold text-primary' : 'text-xs font-semibold text-warning'}>
-            {canRenew ? '更新できます' : '次の期限'}
-          </span>
-          <strong className="mt-2 font-mono text-3xl tracking-tight text-foreground">
-            {formatMonthDay(credential.currentExpiresOn)}
-          </strong>
-          <small className="mt-1 font-mono text-xs text-muted">
-            {formatDeadlineMeta(credential.currentExpiresOn)}
-          </small>
-        </div>
+          <div
+            className={
+              canRenew
+                ? 'flex flex-col justify-center border-b border-border bg-primary-soft/70 px-5 py-5 md:border-b-0 md:border-r'
+                : 'flex flex-col justify-center border-b border-border bg-warning-soft/60 px-5 py-5 md:border-b-0 md:border-r'
+            }
+          >
+            <span className={canRenew ? 'text-xs font-semibold text-primary' : 'text-xs font-semibold text-warning'}>
+              {canRenew ? '更新できます' : '次の期限'}
+            </span>
+            <strong className="mt-2 font-mono text-3xl tracking-tight text-foreground">
+              {formatMonthDay(credential.currentExpiresOn)}
+            </strong>
+            <small className="mt-1 font-mono text-xs text-muted">
+              {formatDeadlineMeta(credential.currentExpiresOn)}
+            </small>
+          </div>
 
-        <div className="min-w-0 px-5 py-5 sm:px-6">
-          <div className="font-mono text-xs font-semibold text-primary">
-            {credential.displayCode ?? 'Credential'}
-          </div>
-          <h2 className="mt-1 text-lg font-semibold leading-7 tracking-tight text-foreground">
-            {credential.name}
-          </h2>
-          <div className="mt-3">
-            <CredentialStatus status={credential.status} />
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted">{renewalNote(credential)}</p>
-          {canRenew ? (
-            <div className="mt-4">
-              <Button asChild variant="secondary" size="sm">
-                <a href="#schedule">更新予定を確認</a>
-              </Button>
+          <div className="min-w-0 px-5 py-5 sm:px-6">
+            <div className="font-mono text-xs font-semibold text-primary">
+              {credential.displayCode ?? 'Credential'}
             </div>
-          ) : null}
-        </div>
+            <h2 className="mt-1 text-lg font-semibold leading-7 tracking-tight text-foreground">
+              {credential.name}
+            </h2>
+            <div className="mt-3">
+              <CredentialStatus status={credential.status} />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted">{renewalNote(credential)}</p>
+            {canRenew ? (
+              <div className="mt-4">
+                <Button asChild variant="secondary" size="sm">
+                  <a href="#schedule">更新予定を確認</a>
+                </Button>
+              </div>
+            ) : null}
+          </div>
 
-        <div className="flex items-baseline justify-start gap-1 border-t border-border bg-surface-muted px-5 py-4 md:flex-col md:items-center md:justify-center md:border-l md:border-t-0">
-          <span className="sr-only">有効期限まで</span>
-          <strong className="font-mono text-3xl font-semibold tracking-tight text-foreground">
-            {credential.daysUntilExpiry ?? 0}
-          </strong>
-          <span className="text-sm font-medium text-muted">日</span>
+          <div className="flex items-baseline justify-start gap-1 border-t border-border bg-surface-muted px-5 py-4 md:flex-col md:items-center md:justify-center md:border-l md:border-t-0">
+            <span className="sr-only">有効期限まで</span>
+            <strong className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+              {credential.daysUntilExpiry ?? 0}
+            </strong>
+            <span className="text-sm font-medium text-muted">日</span>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+      <ExpiredNotice count={expired.length} />
+    </div>
   );
 }
