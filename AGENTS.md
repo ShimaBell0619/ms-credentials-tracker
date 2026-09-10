@@ -1,16 +1,51 @@
 # Agent Instructions — Microsoft Credentials Tracker
 
-Foundation-Version: 0.5.0
-Foundation-Commit: a8c9098653446127e2610f4abaf44dd55ffe50a6
+Foundation-Version: 0.7.0
+Foundation-Commit: c968b8af1f666d8f6024cd9e292c91cbf631fefe
 
 ## Read order
 
-1. `PRODUCT.md`
-2. `DESIGN.md`
-3. `docs/DOMAIN.md`
-4. `AGENTS.md`
-5. relevant Issue / PR
-6. Foundation specialist guidance when needed
+Before a material change:
+
+1. Read the Issue / approved request and Acceptance Criteria.
+2. Read `PRODUCT.md` for approved product behavior, scope, and non-goals.
+3. Read `AGENTS.md` for repository-specific engineering and routing rules.
+4. Apply `## Context routing` and load the union of matching contracts.
+5. Read `README.md` only when public/user/contributor documentation or documented usage is affected.
+
+Do not reconstruct current design or architecture from chat memory when repository contracts are available.
+
+## Context routing
+
+The base route is the Issue / approved request, `PRODUCT.md`, and `AGENTS.md`. Load `docs/FOUNDATION.md` when Foundation-derived rules, provenance, or adoption are relevant. Matching routes are additive.
+
+| Change area / condition | Required context in addition to the base route |
+| --- | --- |
+| Product design / UX | `DESIGN.md` |
+| UI infrastructure | `DESIGN.md`, `docs/FOUNDATION.md`, applicable released Foundation UI implementation/review guidance |
+| Domain / data | `docs/DOMAIN.md`, `docs/ARCHITECTURE.md` |
+| Credential catalog | `docs/CREDENTIAL_CATALOG.md`, `docs/DOMAIN.md` |
+| Transcript PDF import | `docs/DOMAIN.md`, `docs/ARCHITECTURE.md` |
+| Google Calendar integration / trust | `docs/GOOGLE_CALENDAR.md`, `docs/ARCHITECTURE.md` |
+| Architecture / platform | `docs/ARCHITECTURE.md` |
+| Delivery / operations | `docs/DEPLOYMENT.md` |
+| Staging / OAuth origin | `docs/STAGING.md`, `docs/DEPLOYMENT.md` |
+| Foundation adoption | `docs/FOUNDATION.md`, target Foundation CHANGELOG/adoption guidance |
+
+If implementation discovery expands into another material area, route and load that contract before writing across the new boundary. When a normative specialist document is created, renamed, or retired, update this table in the same change if future agents depend on it for discovery. Do not read every repository document merely because it exists.
+
+## Context-routed Chat implementation
+
+For material Chat-based work, follow the adopted Foundation v0.7.0 profile:
+
+- build a session-local Repository Context Packet from the Issue/AC, base SHA, routed contracts, relevant implementation/tests, and Foundation provenance;
+- extract change-specific Design Intent before implementation: requested delta, must preserve, may change, must not change, responsibility/trust boundaries, validation requirements, and explicit non-goals;
+- map each material contract/AC to its implementation surface and validation evidence before the first write;
+- use a Bootstrap Read once, then Incremental Read for corrections and newly affected routes instead of repeatedly loading unchanged contracts;
+- batch related GitHub reads and coherent writes when practical while preserving expected-HEAD checks, conflict reconciliation, security boundaries, and validation;
+- self-review the final diff against the same Design Intent before completion.
+
+The packet is working state, not a repository source of truth. Do not create a permanent `CONTEXT.md` or duplicate repository contracts into Issues merely to feed the agent.
 
 ## Current baseline
 
@@ -62,6 +97,15 @@ The approved credential-domain and MVP data-boundary decisions are recorded in `
 - Keep domain parsing/normalization independent from the browser-storage adapter so server-side persistence can replace it later.
 - Do not introduce authentication, a server-side database/API, automatic synchronization, or other material architecture decisions without explicit approval.
 
+## Complexity discipline
+
+- Prefer the smallest coherent solution that satisfies the current Acceptance Criteria and Design Intent.
+- Do not add abstractions, layers, dependencies, services, workflows, configuration formats, permanent process artifacts, compatibility adapters, or extension points only for hypothetical future reuse, stylistic purity, or conformity with a newer standard.
+- Additional complexity needs a current requirement, real responsibility/lifecycle/security/trust/compatibility boundary, observed repetition, measured evidence, or an adopted Foundation contract.
+- Even when justified, use the least powerful mechanism that solves the current problem.
+- Do not replace stable consumer code solely because a newer Foundation default exists; migration requires an objective benefit and bounded scope.
+- Do not simplify away complexity required for security, failure recovery, concurrency/data integrity, accessibility, or validation.
+
 ## Review and completion
 
 For every material change:
@@ -91,7 +135,7 @@ Independent review is a separate, risk-based layer performed by a reviewer that 
 
 When acting as an independent reviewer, prioritize concrete high-impact defects over mechanical or stylistic findings.
 
-- **Contract integrity** — compare the PR purpose, Issue/Acceptance Criteria, `PRODUCT.md`, `DESIGN.md`, `docs/DOMAIN.md`, diff, tests, and current behavior. Flag requirement mismatches and regressions.
+- **Contract integrity** — compare the PR purpose, Issue/Acceptance Criteria, `PRODUCT.md`, `DESIGN.md`, routed specialist contracts, diff, tests, and current behavior. Flag requirement mismatches and regressions.
 - **Trust and delivery safety** — flag untrusted PR code executing with write credentials/secrets, release or deployment of a different revision than the validated SHA, OAuth/privacy-boundary mistakes, or quality-gate bypasses.
 - **State and compatibility safety** — flag concrete local-storage migration/data-integrity failures, Google Calendar reconciliation/idempotency problems, concurrency/race/cleanup defects, destructive side effects, or backward-compatibility failures.
 

@@ -1,6 +1,6 @@
 # vNext UI Standard Trial
 
-This document records the Microsoft Credentials Tracker trial of the candidate Web App Foundation design standard selected after v0.6.0. It is implementation evidence, not a claim that the candidate has already shipped as a Foundation release.
+This document records the Microsoft Credentials Tracker trial of a candidate Web App Foundation UI standard selected after v0.6.0. Foundation v0.7.0 has since released the context-routed AI implementation profile, but the UI decisions exercised here remain consumer evidence rather than released v0.7.0 UI requirements.
 
 ## Trial scope
 
@@ -59,11 +59,11 @@ The existing Foundation-derived review loop remains authoritative. This trial mu
 - text alongside required status meaning,
 - usable dialog sizing on narrow screens.
 
-The dedicated Playwright proof additionally checks focus return after Escape, outside dismissal, reduced-motion CSS, and resolution of the new runtime semantic token layer.
+The dedicated Playwright proof additionally checks focus return after Escape across the affected dialog workflows, outside dismissal, reduced-motion CSS, and resolution of the new runtime semantic token layer.
 
 ## Candidate Foundation feedback
 
-If this trial passes, the following are appropriate to generalize into the next Foundation minor release:
+If this trial continues to validate well in real use, the following are appropriate to consider for a future Foundation release after v0.7.0:
 
 1. New React consumers use native HTML first and Base UI as the default complex primitive family.
 2. shadcn remains a source-acquisition/component-architecture model rather than a product visual skin.
