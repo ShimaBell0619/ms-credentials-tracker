@@ -7,7 +7,7 @@ import { formatMonthDay, parseIsoDate } from '../presentation/credential-view';
 
 interface TimelineMonth {
   id: string;
-  label: string;
+  month: number;
   days: number;
 }
 
@@ -25,8 +25,8 @@ function monthSequence(start: string, end: string): TimelineMonth[] {
 
   while (cursor <= endDate) {
     const year = cursor.getUTCFullYear();
-    const month = cursor.getUTCMonth();
-    const nextMonth = new Date(Date.UTC(year, month + 1, 1));
+    const monthIndex = cursor.getUTCMonth();
+    const nextMonth = new Date(Date.UTC(year, monthIndex + 1, 1));
     const segmentStart = cursor < startDate ? startDate : cursor;
     const segmentEnd = nextMonth < endExclusive ? nextMonth : endExclusive;
     const days = Math.max(
@@ -34,7 +34,7 @@ function monthSequence(start: string, end: string): TimelineMonth[] {
       Math.round((segmentEnd.getTime() - segmentStart.getTime()) / (24 * 60 * 60 * 1000)),
     );
 
-    months.push({ id: `${year}-${month + 1}`, label: `${month + 1}月`, days });
+    months.push({ id: `${year}-${monthIndex + 1}`, month: monthIndex + 1, days });
     cursor = nextMonth;
   }
 
@@ -99,7 +99,10 @@ export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimel
             }}
           >
             {months.map((month) => (
-              <span key={month.id}>{month.label}</span>
+              <span key={month.id}>
+                <span className="sm:hidden">{month.month}</span>
+                <span className="hidden sm:inline">{month.month}月</span>
+              </span>
             ))}
           </div>
           <div className="timeline-rail live-timeline-rail">
