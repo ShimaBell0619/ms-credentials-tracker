@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { localDateToIso } from '../domain/credential-projection.ts';
 import { findReusableGoogleCalendarId } from '../integrations/google-calendar-discovery.ts';
@@ -23,7 +23,14 @@ import {
   CREDENTIAL_STORAGE_CHANGED_EVENT,
   loadStoredCredentials,
 } from '../storage/local-credential-store.ts';
-import '../calendar-sync.css';
+import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 
 type AuthReadiness = 'idle' | 'loading' | 'ready' | 'error';
 type SyncPhase = 'idle' | 'authorizing' | 'syncing' | 'success' | 'error';
@@ -61,7 +68,6 @@ function buildGoogleCalendarEmbedUrl(calendarId: string | null): string | null {
 }
 
 export function GoogleCalendarSync() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [calendarPortalTarget, setCalendarPortalTarget] = useState<HTMLElement | null>(null);
   const [credentials, setCredentials] = useState(() => loadStoredCredentials());
@@ -97,7 +103,6 @@ export function GoogleCalendarSync() {
     setSyncPhase('idle');
     setIntegration(loadGoogleCalendarIntegrationState());
     setDialogOpen(true);
-    dialogRef.current?.showModal();
   }
 
   useEffect(() => {
@@ -148,7 +153,7 @@ export function GoogleCalendarSync() {
     return () => {
       cancelled = true;
     };
-  }, [dialogOpen]);
+  }, [clientId, dialogOpen]);
 
   async function synchronize() {
     if (!clientId || authReadiness !== 'ready') return;
@@ -221,44 +226,48 @@ export function GoogleCalendarSync() {
 
   const trigger = (
     <>
-      <button className="calendar-trigger" type="button" onClick={openDialog}>
+      <Button variant="secondary" size="sm" type="button" onClick={openDialog}>
         {needsSync && integration.calendarId ? 'カレンダーを更新' : 'Googleカレンダー'}
-      </button>
-      {needsSync ? <span className="calendar-sync-needed">未同期</span> : null}
+      </Button>
+      {needsSync ? (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
+          <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />
+          未同期
+        </span>
+      ) : null}
     </>
   );
 
   const calendarPanel = (
     <div className="google-calendar-panel">
-      <div className="section-heading compact-heading google-calendar-heading">
+      <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <p className="context-label">External calendar</p>
-          <h2>Googleカレンダー</h2>
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.08em] text-muted">External calendar</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Googleカレンダー</h2>
         </div>
-        <span className="google-calendar-state">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+          <span className={integration.calendarId ? 'size-1.5 rounded-full bg-success' : 'size-1.5 rounded-full bg-slate-status'} aria-hidden="true" />
           {integration.calendarId ? '同期済み' : '未同期'}
         </span>
       </div>
 
       {embeddedCalendarUrl ? (
         <>
-          <div className="google-calendar-frame-wrap">
+          <div className="overflow-hidden rounded-lg border border-border bg-white">
             <iframe
-              className="google-calendar-frame"
+              className="block h-[420px] w-full border-0 bg-white sm:h-[460px] lg:h-[420px]"
               title="Microsoft Credentials Tracker Google Calendar"
               src={embeddedCalendarUrl}
               loading="lazy"
               referrerPolicy="strict-origin-when-cross-origin"
             />
           </div>
-          <p className="google-calendar-note">
-            Google Calendar側のログイン状態を利用して表示します。
-          </p>
+          <p className="mt-2 text-xs leading-5 text-muted">Google Calendar側のログイン状態を利用して表示します。</p>
         </>
       ) : (
-        <div className="google-calendar-empty">
-          <strong>Googleカレンダーはまだ接続されていません</strong>
-          <span>画面上部の「Googleカレンダー」から同期すると、ここに予定を表示します。</span>
+        <div className="rounded-lg border border-dashed border-border-strong bg-surface-muted px-4 py-6">
+          <strong className="block text-sm font-semibold text-foreground">Googleカレンダーはまだ接続されていません</strong>
+          <span className="mt-1 block text-xs leading-5 text-muted">画面上部の「Googleカレンダー」から同期すると、ここに予定を表示します。</span>
         </div>
       )}
     </div>
@@ -269,93 +278,81 @@ export function GoogleCalendarSync() {
       {portalTarget ? createPortal(trigger, portalTarget) : null}
       {calendarPortalTarget ? createPortal(calendarPanel, calendarPortalTarget) : null}
 
-      <dialog
-        ref={dialogRef}
-        className="calendar-sync-dialog"
-        aria-labelledby="calendar-sync-title"
-        onClose={() => setDialogOpen(false)}
-      >
-        <div className="calendar-sync-header">
-          <div>
-            <p className="context-label">External reminders</p>
-            <h2 id="calendar-sync-title">Googleカレンダー同期</h2>
-          </div>
-          <form method="dialog">
-            <button className="calendar-sync-close" type="submit" aria-label="閉じる">
-              ×
-            </button>
-          </form>
-        </div>
-
-        <div className="calendar-sync-body">
-          <p className="calendar-sync-description">
-            資格の更新可能日と有効期限を専用カレンダーへ一方向同期します。更新可能日の通知は28日前・7日前・当日に届きます。
-          </p>
-
-          {needsSync && integration.calendarId ? (
-            <p className="calendar-sync-change-note" role="status">
-              資格情報が前回同期時点から変わっています。明示的に同期するとGoogleカレンダーへ反映されます。
-            </p>
-          ) : null}
-
-          <dl className="calendar-sync-summary">
-            <div>
-              <dt>同期対象</dt>
-              <dd>{credentialCount}資格 · {desiredEvents.length}予定</dd>
-            </div>
-            <div>
-              <dt>同期先</dt>
-              <dd>Microsoft Credentials Tracker</dd>
-            </div>
-            <div>
-              <dt>最終同期</dt>
-              <dd>{formatLastSynced(integration.lastSyncedAt)}</dd>
-            </div>
-          </dl>
-
-          {!clientId ? (
-            <p className="calendar-sync-warning" role="note">
-              Google OAuth クライアントが未設定です。VITE_GOOGLE_CLIENT_ID を設定すると同期を有効化できます。
-            </p>
-          ) : authReadiness === 'error' ? (
-            <p className="calendar-sync-warning" role="alert">
-              Google認証ライブラリを読み込めませんでした。ネットワーク接続を確認してください。
-            </p>
-          ) : null}
-
-          <div className="calendar-sync-policy">
-            <strong>同期時の扱い</strong>
-            <ul>
-              <li>このアプリが管理する予定だけを作成・更新・削除します。</li>
-              <li>Google側の予定変更を資格データへ逆同期しません。</li>
-              <li>アクセストークンはブラウザへ長期保存しません。</li>
-            </ul>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-xl p-0">
+          <div className="border-b border-border px-5 py-5 sm:px-6">
+            <DialogHeader>
+              <p className="text-xs font-semibold text-primary">External reminders</p>
+              <DialogTitle>Googleカレンダー同期</DialogTitle>
+              <DialogDescription>
+                資格の更新可能日と有効期限を専用カレンダーへ一方向同期します。更新可能日の通知は28日前・7日前・当日に届きます。
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div className="calendar-sync-actions">
-            <button
-              className="primary-action"
-              type="button"
-              onClick={synchronize}
-              disabled={!clientId || authReadiness !== 'ready' || busy}
-            >
-              {syncButtonLabel}
-            </button>
-            {clientId && authReadiness === 'loading' ? <span>Google認証を準備中…</span> : null}
-          </div>
+          <div className="grid gap-5 px-5 py-5 sm:px-6">
+            {needsSync && integration.calendarId ? (
+              <p className="rounded-md border border-primary/15 bg-primary-soft px-3 py-2 text-sm leading-6 text-foreground" role="status">
+                資格情報が前回同期時点から変わっています。明示的に同期するとGoogleカレンダーへ反映されます。
+              </p>
+            ) : null}
 
-          {message ? (
-            <p
-              className={
-                syncPhase === 'error' ? 'calendar-sync-message is-error' : 'calendar-sync-message'
-              }
-              role={syncPhase === 'error' ? 'alert' : 'status'}
-            >
-              {message}
-            </p>
-          ) : null}
-        </div>
-      </dialog>
+            <dl className="grid divide-y divide-border rounded-lg border border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="p-3">
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">同期対象</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">{credentialCount}資格 · {desiredEvents.length}予定</dd>
+              </div>
+              <div className="p-3">
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">同期先</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">Microsoft Credentials Tracker</dd>
+              </div>
+              <div className="p-3">
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">最終同期</dt>
+                <dd className="mt-1 text-sm font-semibold text-foreground">{formatLastSynced(integration.lastSyncedAt)}</dd>
+              </div>
+            </dl>
+
+            {!clientId ? (
+              <p className="rounded-md border border-warning/20 bg-warning-soft px-3 py-2 text-sm leading-6 text-warning" role="note">
+                Google OAuth クライアントが未設定です。VITE_GOOGLE_CLIENT_ID を設定すると同期を有効化できます。
+              </p>
+            ) : authReadiness === 'error' ? (
+              <p className="rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-sm leading-6 text-danger" role="alert">
+                Google認証ライブラリを読み込めませんでした。ネットワーク接続を確認してください。
+              </p>
+            ) : null}
+
+            <div>
+              <strong className="text-sm font-semibold text-foreground">同期時の扱い</strong>
+              <ul className="mt-2 grid gap-1.5 pl-5 text-sm leading-6 text-muted">
+                <li className="list-disc">このアプリが管理する予定だけを作成・更新・削除します。</li>
+                <li className="list-disc">Google側の予定変更を資格データへ逆同期しません。</li>
+                <li className="list-disc">アクセストークンはブラウザへ長期保存しません。</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button type="button" onClick={synchronize} disabled={!clientId || authReadiness !== 'ready' || busy}>
+                {syncButtonLabel}
+              </Button>
+              {clientId && authReadiness === 'loading' ? <span className="text-xs text-muted">Google認証を準備中…</span> : null}
+            </div>
+
+            {message ? (
+              <p
+                className={
+                  syncPhase === 'error'
+                    ? 'rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-sm leading-6 text-danger'
+                    : 'rounded-md border border-success/20 bg-success-soft px-3 py-2 text-sm leading-6 text-success'
+                }
+                role={syncPhase === 'error' ? 'alert' : 'status'}
+              >
+                {message}
+              </p>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

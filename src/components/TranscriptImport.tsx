@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { credentialDefinitions } from '../domain/credential-catalog.ts';
 import {
   parseMicrosoftLearnTranscript,
@@ -14,7 +14,16 @@ import {
   TranscriptPdfReadException,
   type TranscriptPdfReadError,
 } from '../transport/transcript-pdf.ts';
-import '../import.css';
+import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Input } from './ui/input';
+import { NativeSelect } from './ui/native-select';
 
 export const OPEN_TRANSCRIPT_IMPORT_EVENT = 'ms-credentials-tracker:open-transcript-import';
 
@@ -39,9 +48,7 @@ function buildDiagnostics(text: string): TranscriptDiagnostics {
     japaneseDateCount: (
       normalized.match(/\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日/g) ?? []
     ).length,
-    activeHeading: /アクティブな認定資格|有効な認定資格|Active certifications/i.test(
-      normalized,
-    ),
+    activeHeading: /アクティブな認定資格|有効な認定資格|Active certifications/i.test(normalized),
     examHeading: /合格した試験|合格済みの試験|Passed exams/i.test(normalized),
   };
 }
@@ -75,7 +82,7 @@ function candidateKey(candidate: TranscriptCredentialCandidate, index: number): 
 }
 
 export function TranscriptImport() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<TranscriptParseResult | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
@@ -111,17 +118,17 @@ export function TranscriptImport() {
   function openDialog() {
     setMessage(null);
     setLoadError(null);
-    dialogRef.current?.showModal();
+    setOpen(true);
   }
 
   useEffect(() => {
-    const open = () => {
+    const handleOpen = () => {
       setMessage(null);
       setLoadError(null);
-      dialogRef.current?.showModal();
+      setOpen(true);
     };
-    window.addEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
-    return () => window.removeEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, open);
+    window.addEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, handleOpen);
+    return () => window.removeEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, handleOpen);
   }, []);
 
   function selectFile(nextFile: File | null) {
@@ -150,8 +157,7 @@ export function TranscriptImport() {
       setDiagnostics(buildDiagnostics(extracted.text));
       setResult(parseMicrosoftLearnTranscript(extracted.text));
     } catch (error) {
-      const code =
-        error instanceof TranscriptPdfReadException ? error.code : ('invalidPdf' as const);
+      const code = error instanceof TranscriptPdfReadException ? error.code : ('invalidPdf' as const);
       setLoadError(pdfErrorMessage(code));
     } finally {
       setIsLoading(false);
@@ -168,131 +174,121 @@ export function TranscriptImport() {
     if (saved.updatedCount > 0) parts.push(`${saved.updatedCount}件を更新`);
     if (saved.unchangedCount > 0) parts.push(`${saved.unchangedCount}件を再確認`);
     if (saved.conflictCount > 0) parts.push(`${saved.conflictCount}件は手動修正と競合`);
-    setMessage(
-      parts.length > 0
-        ? `${parts.join('、')}しました。`
-        : '保存できる資格はありませんでした。',
-    );
+    setMessage(parts.length > 0 ? `${parts.join('、')}しました。` : '保存できる資格はありませんでした。');
   }
 
   return (
-    <>
-      <button className="import-trigger" type="button" onClick={openDialog}>
-        資格を取り込む
-      </button>
-      {savedCount > 0 ? (
-        <span className="saved-count">
-          <span className="sr-only">保存済み </span>
-          {savedCount}
-          <span className="sr-only">件</span>
-        </span>
-      ) : null}
-
-      <dialog ref={dialogRef} className="import-dialog" aria-labelledby="import-dialog-title">
-        <div className="import-dialog-header">
-          <div>
-            <p className="context-label">Microsoft Learn Transcript</p>
-            <h2 id="import-dialog-title">資格情報を取り込む</h2>
-          </div>
-          <form method="dialog">
-            <button className="dialog-close" type="submit" aria-label="閉じる">
-              ×
-            </button>
-          </form>
-        </div>
-
-        <p className="import-description">
-          Microsoft Learn の Transcript を「印刷 → PDFとして保存」して選択します。PDF はこのブラウザ内だけで解析し、外部へアップロードしません。
-        </p>
-
-        <label className="transcript-field">
-          <span>Transcript PDF</span>
-          <input
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={(event) => selectFile(event.currentTarget.files?.[0] ?? null)}
-          />
-          <small>最大 10 MB。テキストを含む PDF が対象です。</small>
-        </label>
-
-        <div className="import-actions">
-          <button
-            className="primary-action"
-            type="button"
-            onClick={analyzePdf}
-            disabled={!file || isLoading}
-          >
-            {isLoading ? '解析中…' : 'PDFを解析する'}
-          </button>
-          <span>PDF ファイル自体は保存しません</span>
-        </div>
-
-        {loadError ? (
-          <p className="load-error" role="alert">
-            {loadError}
-          </p>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" size="sm" type="button" onClick={openDialog}>
+          資格を取り込む
+        </Button>
+        {savedCount > 0 ? (
+          <span className="saved-count inline-flex min-w-5 items-center justify-center font-mono text-[11px] font-semibold text-muted">
+            <span className="sr-only">保存済み </span>
+            {savedCount}
+            <span className="sr-only">件</span>
+          </span>
         ) : null}
+      </div>
+
+      <DialogContent className="max-w-3xl p-0">
+        <div className="border-b border-border px-5 py-5 sm:px-6">
+          <DialogHeader>
+            <p className="text-xs font-semibold text-primary">Microsoft Learn Transcript</p>
+            <DialogTitle>資格情報を取り込む</DialogTitle>
+            <DialogDescription>
+              Microsoft Learn の Transcript を「印刷 → PDFとして保存」して選択します。PDF はこのブラウザ内だけで解析し、外部へアップロードしません。
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="grid gap-5 px-5 py-5 sm:px-6">
+          <div className="grid gap-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="transcript-pdf">
+              Transcript PDF
+            </label>
+            <Input
+              id="transcript-pdf"
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(event) => selectFile(event.currentTarget.files?.[0] ?? null)}
+            />
+            <small className="text-xs leading-5 text-muted">最大 10 MB。テキストを含む PDF が対象です。</small>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" onClick={analyzePdf} disabled={!file || isLoading}>
+              {isLoading ? '解析中…' : 'PDFを解析する'}
+            </Button>
+            <span className="text-xs text-muted">PDF ファイル自体は保存しません</span>
+          </div>
+
+          {loadError ? (
+            <p className="rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-sm leading-6 text-danger" role="alert">
+              {loadError}
+            </p>
+          ) : null}
+        </div>
 
         {result ? (
-          <section className="import-results" aria-labelledby="import-results-title">
-            <div className="import-result-summary">
+          <section className="border-t border-border px-5 py-5 sm:px-6" aria-labelledby="import-results-title">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="context-label">
+                <p className="text-xs font-semibold text-muted">
                   Import candidates{pageCount ? ` · ${pageCount}ページ` : ''}
                 </p>
-                <h3 id="import-results-title">解析結果</h3>
+                <h3 id="import-results-title" className="mt-1 text-lg font-semibold tracking-tight text-foreground">解析結果</h3>
               </div>
-              <dl>
-                <div>
-                  <dt>資格</dt>
-                  <dd>{result.credentials.length}</dd>
-                </div>
-                <div>
-                  <dt>照合済み</dt>
-                  <dd>{matchedCount}</dd>
-                </div>
-                <div>
-                  <dt>未照合</dt>
-                  <dd>{unresolvedCount}</dd>
-                </div>
-                <div>
-                  <dt>試験</dt>
-                  <dd>{result.exams.length}</dd>
-                </div>
+              <dl className="grid grid-cols-4 gap-x-5 border-y border-border py-2 text-right sm:border-0 sm:py-0">
+                {[
+                  ['資格', result.credentials.length],
+                  ['照合済み', matchedCount],
+                  ['未照合', unresolvedCount],
+                  ['試験', result.exams.length],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-[10px] font-semibold text-muted">{label}</dt>
+                    <dd className="mt-1 font-mono text-sm font-semibold text-foreground">{value}</dd>
+                  </div>
+                ))}
               </dl>
             </div>
 
             {result.credentials.length > 0 ? (
-              <ul className="candidate-list">
+              <ul className="mt-5 divide-y divide-border border-y border-border">
                 {result.credentials.map((candidate, index) => {
                   const key = candidateKey(candidate, index);
                   const mappedDefinitionId = resolutionMap[key] ?? '';
                   return (
-                    <li key={key}>
-                      <div className="candidate-title">
-                        <strong>{candidate.detectedTitle}</strong>
-                        <span>
+                    <li className="py-4" key={key}>
+                      <div className="candidate-title flex items-start justify-between gap-4">
+                        <strong className="text-sm font-semibold leading-6 text-foreground">{candidate.detectedTitle}</strong>
+                        <span className="shrink-0 text-xs text-muted">
                           {candidate.kind === 'certification' ? 'Certification' : 'Applied Skill'}
                         </span>
                       </div>
-                      <dl>
+                      <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-3">
                         <div>
-                          <dt>取得日</dt>
-                          <dd>{candidate.earnedOn ?? '解析できませんでした'}</dd>
+                          <dt className="font-medium text-muted">取得日</dt>
+                          <dd className="mt-1 font-mono font-medium text-foreground">{candidate.earnedOn ?? '解析できませんでした'}</dd>
                         </div>
                         <div>
-                          <dt>有効期限</dt>
-                          <dd>{candidate.expiresOn ?? '期限なし / 不明'}</dd>
+                          <dt className="font-medium text-muted">有効期限</dt>
+                          <dd className="mt-1 font-mono font-medium text-foreground">{candidate.expiresOn ?? '期限なし / 不明'}</dd>
                         </div>
                         <div>
-                          <dt>照合</dt>
-                          <dd>{candidate.matchStatus === 'matched' || mappedDefinitionId ? '照合済み' : '未照合'}</dd>
+                          <dt className="font-medium text-muted">照合</dt>
+                          <dd className="mt-1 font-medium text-foreground">
+                            {candidate.matchStatus === 'matched' || mappedDefinitionId ? '照合済み' : '未照合'}
+                          </dd>
                         </div>
                       </dl>
+
                       {candidate.matchStatus === 'unresolved' ? (
-                        <label className="candidate-resolution">
-                          <span>この資格を手動で照合</span>
-                          <select
+                        <label className="mt-4 grid gap-2 border-t border-border pt-4">
+                          <span className="text-sm font-semibold text-foreground">この資格を手動で照合</span>
+                          <NativeSelect
                             value={mappedDefinitionId}
                             onChange={(event) =>
                               setResolutionMap((current) => ({
@@ -309,8 +305,10 @@ export function TranscriptImport() {
                                   {definition.displayCode ? `${definition.displayCode} · ` : ''}{definition.canonicalTitle}
                                 </option>
                               ))}
-                          </select>
-                          <small>タイトルが似ているだけでは自動照合しません。内容を確認して選択してください。</small>
+                          </NativeSelect>
+                          <small className="text-xs leading-5 text-muted">
+                            タイトルが似ているだけでは自動照合しません。内容を確認して選択してください。
+                          </small>
                         </label>
                       ) : null}
                     </li>
@@ -320,14 +318,14 @@ export function TranscriptImport() {
             ) : null}
 
             {result.exams.length > 0 ? (
-              <details className="exam-results">
-                <summary>検出した試験履歴 {result.exams.length}件</summary>
-                <ul>
+              <details className="mt-5 border-b border-border pb-4">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">検出した試験履歴 {result.exams.length}件</summary>
+                <ul className="mt-3 grid gap-2">
                   {result.exams.map((exam) => (
-                    <li key={`${exam.examNumber}-${exam.passedOn ?? ''}`}>
-                      <strong>{exam.examNumber}</strong>
-                      <span>{exam.title}</span>
-                      <time>{exam.passedOn ?? '日付不明'}</time>
+                    <li className="grid grid-cols-[70px_minmax(0,1fr)] gap-2 text-xs sm:grid-cols-[70px_minmax(0,1fr)_auto]" key={`${exam.examNumber}-${exam.passedOn ?? ''}`}>
+                      <strong className="font-mono text-foreground">{exam.examNumber}</strong>
+                      <span className="text-muted">{exam.title}</span>
+                      <time className="col-start-2 font-mono text-muted sm:col-start-auto">{exam.passedOn ?? '日付不明'}</time>
                     </li>
                   ))}
                 </ul>
@@ -335,68 +333,43 @@ export function TranscriptImport() {
             ) : null}
 
             {result.credentials.length === 0 && result.exams.length === 0 && diagnostics ? (
-              <details className="import-diagnostics" open>
-                <summary>診断情報（個人データは表示しません）</summary>
-                <dl>
-                  <div>
-                    <dt>抽出テキスト</dt>
-                    <dd>{diagnostics.textChars}文字</dd>
-                  </div>
-                  <div>
-                    <dt>Microsoft</dt>
-                    <dd>{diagnostics.microsoftCount}件</dd>
-                  </div>
-                  <div>
-                    <dt>試験コード</dt>
-                    <dd>{diagnostics.examCodeCount}件</dd>
-                  </div>
-                  <div>
-                    <dt>日本語日付</dt>
-                    <dd>{diagnostics.japaneseDateCount}件</dd>
-                  </div>
-                  <div>
-                    <dt>資格見出し</dt>
-                    <dd>{diagnostics.activeHeading ? 'あり' : 'なし'}</dd>
-                  </div>
-                  <div>
-                    <dt>試験見出し</dt>
-                    <dd>{diagnostics.examHeading ? 'あり' : 'なし'}</dd>
-                  </div>
+              <details className="mt-5 rounded-lg border border-border bg-surface-muted p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">診断情報（個人データは表示しません）</summary>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                  <div><dt className="text-muted">抽出テキスト</dt><dd className="font-mono text-foreground">{diagnostics.textChars}文字</dd></div>
+                  <div><dt className="text-muted">Microsoft</dt><dd className="font-mono text-foreground">{diagnostics.microsoftCount}件</dd></div>
+                  <div><dt className="text-muted">試験コード</dt><dd className="font-mono text-foreground">{diagnostics.examCodeCount}件</dd></div>
+                  <div><dt className="text-muted">日本語日付</dt><dd className="font-mono text-foreground">{diagnostics.japaneseDateCount}件</dd></div>
+                  <div><dt className="text-muted">資格見出し</dt><dd className="text-foreground">{diagnostics.activeHeading ? 'あり' : 'なし'}</dd></div>
+                  <div><dt className="text-muted">試験見出し</dt><dd className="text-foreground">{diagnostics.examHeading ? 'あり' : 'なし'}</dd></div>
                 </dl>
               </details>
             ) : null}
 
             {result.warnings.length > 0 ? (
-              <ul className="import-warnings" aria-label="解析時の注意">
-                {result.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
+              <ul className="mt-4 grid gap-1 text-xs leading-5 text-warning" aria-label="解析時の注意">
+                {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
               </ul>
             ) : null}
 
-            <div className="confirm-area">
+            <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <strong>{matchedCount}件を保存・再確認できます</strong>
-                <span>未照合の資格と試験履歴は、この段階では保存しません。</span>
+                <strong className="block text-sm font-semibold text-foreground">{matchedCount}件を保存・再確認できます</strong>
+                <span className="mt-1 block text-xs leading-5 text-muted">未照合の資格と試験履歴は、この段階では保存しません。</span>
               </div>
-              <button
-                className="primary-action"
-                type="button"
-                onClick={confirmImport}
-                disabled={matchedCount === 0}
-              >
+              <Button className="sm:shrink-0" type="button" onClick={confirmImport} disabled={matchedCount === 0}>
                 確認して保存
-              </button>
+              </Button>
             </div>
 
             {message ? (
-              <p className="save-message" role="status">
+              <p className="mt-4 rounded-md border border-success/20 bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">
                 {message}
               </p>
             ) : null}
           </section>
         ) : null}
-      </dialog>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
