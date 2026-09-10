@@ -1,0 +1,49 @@
+name: Temporary Base UI Lockfile Generation
+
+on:
+  push:
+    branches:
+      - feat/issue-49-vnext-ui-standard-poc
+    paths:
+      - .github/workflows/tmp-base-ui-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/issue-49-vnext-ui-standard-poc
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Generate dependency lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --save-exact @base-ui/react@1.8.0
+          npm uninstall --package-lock-only --ignore-scripts @radix-ui/react-dialog
+
+      - name: Commit generated dependency metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No dependency metadata changes were produced."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: switch dialog primitive dependency to Base UI"
+          git push origin HEAD:feat/issue-49-vnext-ui-standard-poc
