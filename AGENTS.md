@@ -30,10 +30,15 @@ The approved credential-domain and MVP data-boundary decisions are recorded in `
 
 - Static or test data must never be presented as live Microsoft account data.
 - Follow the product-specific design direction in `DESIGN.md`; do not fill gaps with generic dashboard defaults.
+- Tailwind CSS is the styling baseline; use established shadcn/ui-style primitives for generic controls instead of rebuilding Button/Dialog/Input interaction behavior in application CSS.
+- Keep `src/components/ui` generic. Product-specific appearance and meaning belong in semantic components such as `CredentialStatus`, `NextRenewal`, `RenewalTimeline`, and `CredentialRegister`.
+- Do not copy shadcn/ui demo composition or treat Card/Badge as automatic page-building defaults. UI-library use and generic AI-template composition are separate concerns.
+- Custom CSS is acceptable when it clearly improves a product-specific visualization such as the proportional 90-day timeline; do not use bespoke CSS as the default for standard controls.
 - Material UI changes require rendered review around 1440px, 390px, and 320px.
 - Check horizontal overflow, Japanese/CJK wrapping, keyboard focus, and state meaning without color-only dependence.
 - Use render → critique → fix → re-render before completion.
 - Import/reconciliation is a supporting workflow and must not displace the next-deadline-first hierarchy on the main schedule view.
+- Manual credential add/edit/archive controls are not part of the current approved UI. Do not restore them without a new product decision.
 
 ## Domain logic
 

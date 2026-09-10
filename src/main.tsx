@@ -3,8 +3,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { GoogleCalendarSync } from './components/GoogleCalendarSync';
 import './styles.css';
-import './live.css';
-import './maintenance.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
