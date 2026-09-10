@@ -1,7 +1,7 @@
 # Agent Instructions — Microsoft Credentials Tracker
 
-Foundation-Version: 0.3.1
-Foundation-Commit: 5382fc2c0735ce82c54dd05c07cb369d4b3b536a
+Foundation-Version: 0.5.0
+Foundation-Commit: a8c9098653446127e2610f4abaf44dd55ffe50a6
 
 ## Read order
 
@@ -56,6 +56,41 @@ The approved credential-domain and MVP data-boundary decisions are recorded in `
 - The current approved MVP source of truth is versioned browser-local storage after explicit user confirmation.
 - Keep domain parsing/normalization independent from the browser-storage adapter so server-side persistence can replace it later.
 - Do not introduce authentication, a server-side database/API, automatic synchronization, or other material architecture decisions without explicit approval.
+
+## Review and completion
+
+For every material change:
+
+1. implement the approved scope;
+2. self-review the final diff and behavior as if authored by another engineer;
+3. correct valid defects or hardening gaps that do not require a new material decision;
+4. re-review after corrections;
+5. run the relevant final validation after the last material correction;
+6. report the reviewed SHA/diff scope, validation evidence, independent-review decision, and remaining risk.
+
+Self-review is mandatory and is not independent review, even when the implementation agent repeats the review from the same implementation context. Do not report a material change complete or merge it while silently carrying an unresolved Blocker/High or otherwise material finding.
+
+## Independent review
+
+Independent review is a separate, risk-based layer performed by a reviewer that did not own the implementation context.
+
+- Low-risk changes may skip independent review when the PR records the reason.
+- For authentication/authorization or trust-boundary changes; destructive/data-integrity risk; concurrency/race-sensitive behavior; compatibility/public-contract changes; CI/CD, release, deployment, rollback, or privileged workflow changes; or serious operational failure modes, obtain independent review before merge when practical.
+- Request independent review against the intended merge-candidate HEAD after self-review and relevant CI succeed.
+- Before every Codex review invocation, including re-review, present the user/maintainer with the concrete rationale, affected risk category, and expected review value, and obtain explicit approval. Do not invoke `@codex review` autonomously or reuse approval from an earlier invocation.
+- Keep Codex Automatic Review / Review my pull requests OFF. After approval, request review manually from the PR conversation with `@codex review`.
+- Reassess Codex findings against the Issue, repository contracts, diff, tests, and CI rather than accepting them mechanically.
+- Do not rerun independent review after every correction. Consider it after Blocker/High fixes or material security, compatibility, CI/CD, deployment, or implementation-path changes. Every new Codex invocation still requires fresh approval.
+
+## Code Review Rules
+
+When acting as an independent reviewer, prioritize concrete high-impact defects over mechanical or stylistic findings.
+
+- **Contract integrity** — compare the PR purpose, Issue/Acceptance Criteria, `PRODUCT.md`, `DESIGN.md`, `docs/DOMAIN.md`, diff, tests, and current behavior. Flag requirement mismatches and regressions.
+- **Trust and delivery safety** — flag untrusted PR code executing with write credentials/secrets, release or deployment of a different revision than the validated SHA, OAuth/privacy-boundary mistakes, or quality-gate bypasses.
+- **State and compatibility safety** — flag concrete local-storage migration/data-integrity failures, Google Calendar reconciliation/idempotency problems, concurrency/race/cleanup defects, destructive side effects, or backward-compatibility failures.
+
+Do not fill review output with formatting, naming taste, style preference, or routine lint/type issues unless they materially contribute to correctness, security, compatibility, or operability risk.
 
 ## Engineering
 
