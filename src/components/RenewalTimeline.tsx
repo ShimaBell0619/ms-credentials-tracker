@@ -11,6 +11,11 @@ interface TimelineMonth {
   days: number;
 }
 
+interface EventGroup {
+  date: string;
+  events: CredentialScheduleEvent[];
+}
+
 function monthSequence(start: string, end: string): TimelineMonth[] {
   const startDate = parseIsoDate(start);
   const endDate = parseIsoDate(end);
@@ -44,14 +49,23 @@ function timelinePosition(referenceDate: string, date: string): string {
 function timelineContext(start: string, end: string): string {
   const startDate = parseIsoDate(start);
   const endDate = parseIsoDate(end);
-  const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
-  const startMonth = formatter.format(startDate);
-  const endMonth = formatter.format(endDate);
   const startYear = startDate.getUTCFullYear();
   const endYear = endDate.getUTCFullYear();
+  const startMonth = startDate.getUTCMonth() + 1;
+  const endMonth = endDate.getUTCMonth() + 1;
   return startYear === endYear
-    ? `${startMonth} — ${endMonth} ${endYear}`
-    : `${startMonth} ${startYear} — ${endMonth} ${endYear}`;
+    ? `${startYear}年${startMonth}月 — ${endMonth}月`
+    : `${startYear}年${startMonth}月 — ${endYear}年${endMonth}月`;
+}
+
+function groupEvents(events: CredentialScheduleEvent[]): EventGroup[] {
+  const groups = new Map<string, CredentialScheduleEvent[]>();
+  for (const event of events) {
+    const current = groups.get(event.date) ?? [];
+    current.push(event);
+    groups.set(event.date, current);
+  }
+  return Array.from(groups, ([date, grouped]) => ({ date, events: grouped }));
 }
 
 interface RenewalTimelineProps {
@@ -62,19 +76,18 @@ interface RenewalTimelineProps {
 
 export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimelineProps) {
   const months = monthSequence(referenceDate, endDate);
+  const eventGroups = groupEvents(events);
 
   return (
     <section id="schedule" className="scroll-mt-20" aria-labelledby="timeline-title">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-            {timelineContext(referenceDate, endDate)}
-          </p>
-          <h2 id="timeline-title" className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+          <h2 id="timeline-title" className="text-xl font-semibold tracking-tight text-foreground">
             90日スケジュール
           </h2>
+          <p className="mt-1 text-sm text-muted">更新開始と期限を日付順に確認します。</p>
         </div>
-        <p className="text-sm text-muted">更新開始と期限を同じ時間軸で確認</p>
+        <p className="font-mono text-xs text-muted">{timelineContext(referenceDate, endDate)}</p>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4 shadow-surface sm:p-5">
@@ -90,36 +103,58 @@ export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimel
             ))}
           </div>
           <div className="timeline-rail live-timeline-rail">
-            {events.map((event) => (
-              <div
-                className={`timeline-pin timeline-pin-${event.kind}`}
-                key={event.id}
-                style={{ '--pin-left': timelinePosition(referenceDate, event.date) } as CSSProperties}
-              />
-            ))}
+            {eventGroups.map((group) => {
+              const hasDeadline = group.events.some((event) => event.kind === 'deadline');
+              return (
+                <div
+                  className={`timeline-pin ${hasDeadline ? 'timeline-pin-deadline' : 'timeline-pin-renewal'}`}
+                  key={group.date}
+                  style={{ '--pin-left': timelinePosition(referenceDate, group.date) } as CSSProperties}
+                />
+              );
+            })}
           </div>
         </div>
 
-        {events.length > 0 ? (
-          <ol className="mt-4 grid divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-3">
-            {events.map((event) => (
-              <li className="flex min-w-0 gap-3 px-1 py-3 sm:px-4" key={event.id}>
-                <time className="shrink-0 font-mono text-xs font-semibold text-foreground" dateTime={event.date}>
-                  {formatMonthDay(event.date)}
-                </time>
-                <div className="min-w-0 flex-1">
-                  <strong className="block text-sm font-semibold leading-5 text-foreground">{event.label}</strong>
-                  <span className="mt-0.5 block text-xs leading-5 text-muted">{event.detail}</span>
-                </div>
-                <span
-                  className={
-                    event.kind === 'deadline'
-                      ? 'shrink-0 text-xs font-semibold text-warning'
-                      : 'shrink-0 text-xs font-semibold text-primary'
-                  }
+        {eventGroups.length > 0 ? (
+          <ol className="mt-4 divide-y divide-border border-t border-border">
+            {eventGroups.map((group) => (
+              <li
+                className="grid gap-3 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:gap-5"
+                key={group.date}
+              >
+                <time
+                  className="font-mono text-xs font-semibold text-foreground"
+                  dateTime={group.date}
                 >
-                  {event.kind === 'deadline' ? '期限' : '更新'}
-                </span>
+                  {formatMonthDay(group.date)}
+                </time>
+                <div className="grid gap-2">
+                  {group.events.map((event) => (
+                    <div
+                      className="flex min-w-0 items-start justify-between gap-3"
+                      key={event.id}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <strong className="block text-sm font-semibold leading-5 text-foreground">
+                          {event.label}
+                        </strong>
+                        <span className="mt-0.5 block text-xs leading-5 text-muted">
+                          {event.detail}
+                        </span>
+                      </div>
+                      <span
+                        className={
+                          event.kind === 'deadline'
+                            ? 'shrink-0 text-xs font-semibold text-warning'
+                            : 'shrink-0 text-xs font-semibold text-primary'
+                        }
+                      >
+                        {event.kind === 'deadline' ? '期限' : '更新'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </li>
             ))}
           </ol>
