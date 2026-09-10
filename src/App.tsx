@@ -49,7 +49,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a className="skip-link" href="#main-content">
         本文へ移動
       </a>
@@ -96,7 +96,7 @@ export default function App() {
 
       <main
         id="main-content"
-        className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
+        className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12"
       >
         {!hasCredentials ? (
           <section className="mx-auto max-w-2xl py-10 sm:py-16" aria-labelledby="onboarding-title">
