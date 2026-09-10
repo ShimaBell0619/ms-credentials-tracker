@@ -73,7 +73,7 @@ test('stale renewal-window data shows a re-import prompt and opens Transcript im
 
   await page.goto('/');
   const banner = page.locator('.freshness-banner');
-  await expect(banner.getByRole('heading', { name: '資格情報を確認してください' })).toBeVisible();
+  await expect(banner.getByRole('heading', { name: '保存している資格情報を確認してください' })).toBeVisible();
   await expect(banner).toContainText('AZ-104');
   await banner.getByRole('button', { name: 'Transcriptを再インポート' }).click();
   await expect(page.getByRole('dialog').getByRole('heading', { name: '資格情報を取り込む' })).toBeVisible();
@@ -85,7 +85,7 @@ test('stale renewal-window data shows a re-import prompt and opens Transcript im
   expect(widths.content).toBeLessThanOrEqual(widths.viewport);
 });
 
-test('manual add, edit, archive, and restore controls are not exposed in the v0.3 UI', async ({ page }) => {
+test('manual add, edit, archive, and restore controls are not exposed in the current UI', async ({ page }) => {
   await freezeDate(page);
   await page.setViewportSize({ width: 320, height: 800 });
   await page.addInitScript(() => {
@@ -114,7 +114,7 @@ test('manual add, edit, archive, and restore controls are not exposed in the v0.
   });
   await page.goto('/');
 
-  await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'データと連携' })).toBeVisible();
   await expect(page.getByRole('button', { name: '手動追加' })).toBeHidden();
   await expect(page.getByRole('button', { name: '資格を追加' })).toBeHidden();
   await expect(page.getByRole('button', { name: '修正' })).toBeHidden();
