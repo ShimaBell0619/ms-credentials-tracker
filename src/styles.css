@@ -169,6 +169,10 @@
     font-size: 0.625rem;
   }
 
+  .month-scale > span:last-child {
+    font-size: 0.5rem;
+  }
+
   .timeline-rail::after {
     transform: translateX(0.25rem);
   }
