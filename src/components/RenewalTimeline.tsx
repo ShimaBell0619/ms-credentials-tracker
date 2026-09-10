@@ -100,7 +100,7 @@ export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimel
           >
             {months.map((month) => (
               <span key={month.id}>
-                <span className="sm:hidden">{month.month}</span>
+                <span className="sm:hidden">{month.days >= 10 ? month.month : null}</span>
                 <span className="hidden sm:inline">{month.month}月</span>
               </span>
             ))}
