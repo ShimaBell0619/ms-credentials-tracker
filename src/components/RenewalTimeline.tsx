@@ -99,9 +99,9 @@ export function RenewalTimeline({ referenceDate, endDate, events }: RenewalTimel
             }}
           >
             {months.map((month) => (
-              <span key={month.id}>
-                <span className="sm:hidden">{month.days >= 10 ? month.month : null}</span>
-                <span className="hidden sm:inline">{month.month}月</span>
+              <span key={month.id} className={month.days >= 10 ? undefined : 'max-sm:text-transparent'}>
+                {month.month}
+                <span className="hidden sm:inline">月</span>
               </span>
             ))}
           </div>
