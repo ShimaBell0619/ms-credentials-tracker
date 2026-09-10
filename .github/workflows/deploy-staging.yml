@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: fixed-staging-deploy-slot
-  cancel-in-progress: false
-
 jobs:
   deploy:
     if: >-
