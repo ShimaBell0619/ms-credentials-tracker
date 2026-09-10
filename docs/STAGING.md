@@ -1,141 +1,82 @@
 # Fixed Staging slot
 
-This repository uses three distinct Vercel review surfaces. They serve different purposes and must not be collapsed into one deployment flow.
+This repository keeps three distinct Vercel review surfaces:
 
 | Surface | Git source | Canonical URL | Purpose |
 | --- | --- | --- | --- |
-| Pull Request Preview | feature / PR branch | generated `*.vercel.app` Preview URL | UI, responsive layout, import, and general feature review |
+| Pull Request Preview | feature / PR branch | generated `*.vercel.app` Preview URL | UI and general feature review |
 | Fixed Staging | mutable `staging` branch | `https://staging.credentials.shimabell.dev` | OAuth, exact-Origin, and external-service integration review |
 | Production | `main` | `https://credentials.shimabell.dev` | released application |
 
-## Staging is a slot, not a release branch
+`staging` is a single mutable verification slot, not a release/integration branch. It points directly to the selected PR HEAD SHA and does not accumulate feature merges.
 
-`staging` does not accumulate feature PR merges and is not part of release history. It always points directly at one commit being evaluated.
+## Request a PR for Fixed Staging
 
-Example:
+1. Open **Actions**.
+2. Select **Request PR for Fixed Staging**.
+3. Run it from `main` and enter the open PR number.
+4. The read-only request workflow writes only bounded request metadata to a short-lived artifact.
+5. The trusted **Publish Fixed Staging** `workflow_run` publisher consumes that request, independently validates the PR, and moves `staging` to the exact PR HEAD SHA.
+6. Vercel Git Integration observes the branch change and deploys `https://staging.credentials.shimabell.dev`.
 
-```text
-PR #20 HEAD = abc123
-staging     = abc123
+Only open same-repository PRs targeting `main` are eligible. Fork PRs are rejected. If the PR receives another commit, submit a new request so the new HEAD is selected explicitly.
 
-later:
+## Privilege boundary
 
-PR #21 HEAD = def456
-staging     = def456
-```
+The manual workflow is intentionally read-only and does not checkout repository or PR code. The workflow that owns `contents: write` is triggered by `workflow_run`, whose workflow definition executes from the trusted default-branch context.
 
-Only one PR can occupy Fixed Staging at a time. Replacing the slot is intentional and does not merge either PR into `main`.
+The publisher accepts only a successful `workflow_dispatch` request from `main` in this repository. Its request artifact is bound to the triggering run ID, repository, and `refs/heads/main`; the publisher then queries GitHub again to validate the current PR state and HEAD.
 
-## Deploy a PR to Fixed Staging
+The selected PR commit may be fetched as a Git object so `staging` can point to it, but selected PR files are never checked out or executed with the publisher's write token.
 
-The workflow is intentionally manual. Creating or updating a PR does not automatically claim the shared Staging slot.
+The selected PR code does execute later inside Vercel's `staging` Preview deployment. Therefore branch-scoped Staging environment values are a separate trust boundary. Do not expose Production secrets to Staging PR code.
 
-1. Open the repository **Actions** tab.
-2. Select **Deploy PR to Staging**.
-3. Choose **Run workflow** from `main`.
-4. Enter the open PR number.
-5. Run the workflow.
+## Ordering and race behavior
 
-The workflow resolves the PR through the GitHub API, validates that it is an open same-repository PR targeting `main`, and records its current HEAD SHA. Fork PRs are rejected.
+Publisher runs use `concurrency.queue: max` and are serialized by the `fixed-staging-deploy-slot` group. The script also checks for newer `main`-branch Staging requests before mutation.
 
-The workflow then moves `staging` to that SHA. It does not build or publish the application itself: Vercel Git Integration observes the `staging` branch update and performs the deployment.
+A newer eligible request supersedes an older request. If the newer request later fails PR validation or deployment, the older request is not replayed automatically; the last successfully committed Staging occupant remains in place.
 
-On success, the workflow writes the PR number, exact SHA, and Staging URL to the workflow summary and attempts to post the same deployment identity to the PR conversation.
+Every ref mutation uses `git push --force-with-lease`, binding the write to the observed `staging` SHA. A stale publisher or cleanup cannot blindly overwrite a newer occupant.
 
-## Security model
+If the selected PR HEAD changes while a publisher is preparing the update, the run fails and requires a new explicit request.
 
-The Staging workflows have write permission because they must move the `staging` Git ref. That permission is deliberately isolated from PR code execution.
+## Cleanup
 
-- The privileged workflow checks out `main` explicitly, not the selected PR HEAD.
-- The selected PR commit may be fetched as a Git object so the ref can point to it, but its files are never checked out or executed by the privileged job.
-- A manually selected PR must belong to this repository and target `main`; fork PRs are rejected.
-- The manual workflow itself must be run from `main`.
-- The workflow uses the repository `GITHUB_TOKEN`; no deployment secret or Google credential is required.
+`Cleanup Staging` uses `pull_request_target: closed`, trusted base/default-branch automation, and never executes PR code.
 
-The Staging application is public for now. Vercel Deployment Protection is not part of this profile.
-
-## Race and stale-run behavior
-
-Fixed Staging is shared mutable state, so every ref mutation uses `git push --force-with-lease` rather than an unconditional force update.
-
-This makes each mutation a compare-and-swap operation: the push succeeds only if `staging` still points to the SHA observed immediately before the mutation.
-
-Manual deployments are also placed in the `fixed-staging-deploy-slot` GitHub Actions concurrency queue. Pending manual requests are retained and processed sequentially. Before mutating the branch, a run also checks for a newer manual workflow run; an older run yields instead of becoming the final Staging selection.
-
-If the PR HEAD changes while a workflow is preparing the update, that run fails without silently switching to a different SHA. Run the workflow again to deploy the new PR HEAD explicitly.
-
-## Cleanup after merge or close
-
-`Cleanup Staging` runs when a Pull Request is closed, including merge.
-
-Cleanup resets `staging` to the current `main` HEAD only when:
+Cleanup resets `staging` to current `main` only when:
 
 ```text
 current staging HEAD == closed PR HEAD SHA
 ```
 
-The reset also uses `--force-with-lease`, so the equality check is atomic with the ref update.
-
-Therefore this sequence is safe:
-
-```text
-PR #20 -> staging
-PR #21 -> staging
-PR #20 -> closed
-```
-
-When PR #20 closes, `staging` already points to PR #21, so PR #20 cleanup does nothing.
-
-If cleanup succeeds:
-
-```text
-staging = current main HEAD
-```
-
-This leaves the branch in a known neutral state while keeping the branch and its Vercel Branch Domain available for the next explicit verification.
+The decision intentionally does not depend on the PR's current base branch. If a PR was staged while targeting `main` and is later retargeted before close, its matching Staging slot can still be released safely. If a newer PR already owns Staging, cleanup skips.
 
 ## Vercel configuration
 
-Repository automation assumes the following Branch Domain mapping exists in the Vercel project:
+The external mapping remains:
 
 ```text
 main    -> https://credentials.shimabell.dev
 staging -> https://staging.credentials.shimabell.dev
 ```
 
-Normal Vercel PR Preview Deployments remain enabled and unchanged.
+`staging` is a Vercel **Preview** branch even though it has a stable Branch Domain. `VITE_GOOGLE_CLIENT_ID` therefore remains configured for Preview scoped to Git branch `staging`, using the same public Client ID as Production.
 
-The repository workflow does not call the Vercel deployment API. A Git push to `staging` remains the deployment trigger, preserving Vercel Git Integration as the hosting owner.
+The repository workflow never calls the Vercel deployment API; Vercel Git Integration remains the hosting/deployment owner.
 
-### Staging environment variables
+## Google OAuth
 
-A deployment from the `staging` Git branch is a Vercel **Preview** deployment, even though it has a stable Branch Domain. Production-only Vercel environment variables are therefore not sufficient for Staging.
-
-`VITE_GOOGLE_CLIENT_ID` must be available to the `staging` Preview deployment. Prefer a Preview environment variable scoped specifically to Git branch `staging`, using the same Client ID value as Production. This keeps the fixed-Origin integration configuration explicit without changing normal PR Preview behavior.
-
-After adding or changing the branch-scoped environment variable, create a new `staging` deployment so Vite rebuilds with the value.
-
-## Google OAuth configuration
-
-Production and Staging intentionally use the same Google OAuth Web Client / Client ID.
-
-The Web Client must contain both exact Authorized JavaScript origins:
+The existing OAuth Web Client keeps both exact Authorized JavaScript origins:
 
 ```text
 https://credentials.shimabell.dev
 https://staging.credentials.shimabell.dev
 ```
 
-Do not remove the Production origin when adding Staging. Do not add wildcard `*.vercel.app` origins, a client secret to this SPA, or a proxy workaround.
+Arbitrary `*.vercel.app` PR Preview origins are not registered. Normal PR Preview remains the default for non-OAuth review; Fixed Staging is requested only when stable-Origin integration testing is needed.
 
-The regular Vercel PR Preview remains useful for non-OAuth review even though its generated Origin is not registered with Google.
+## Browser-origin state
 
-## External setup checklist
-
-Repository-side automation can be merged independently, but Fixed Staging is not usable for Google OAuth at its canonical URL until all external settings are complete:
-
-- Vercel domain: add `staging.credentials.shimabell.dev` to the project and associate it with Git branch `staging`.
-- Vercel environment variable: make `VITE_GOOGLE_CLIENT_ID` available to Preview deployments for Git branch `staging`, using the same Client ID as Production.
-- Google Cloud: add `https://staging.credentials.shimabell.dev` to the existing OAuth Web Client's Authorized JavaScript origins while preserving `https://credentials.shimabell.dev`.
-
-No separate Staging OAuth Client ID is required.
+Production and Fixed Staging remain different browser origins. Their `localStorage`, cookies, IndexedDB, and similar state are not shared. Remote integration resources that should be common across those origins must be rediscovered/reused explicitly rather than relying only on an origin-local identifier.

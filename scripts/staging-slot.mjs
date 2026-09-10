@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -15,9 +16,7 @@ function requireValue(value, name) {
 
 export function parsePrNumber(value) {
   const normalized = requireValue(value, 'PR number');
-  if (!/^[1-9][0-9]*$/.test(normalized)) {
-    throw new Error(`Invalid PR number: ${normalized}`);
-  }
+  if (!/^[1-9][0-9]*$/.test(normalized)) throw new Error(`Invalid PR number: ${normalized}`);
   return Number(normalized);
 }
 
@@ -25,6 +24,27 @@ export function assertSha(value, name = 'SHA') {
   const normalized = requireValue(value, name).toLowerCase();
   if (!SHA_PATTERN.test(normalized)) throw new Error(`Invalid ${name}: ${normalized}`);
   return normalized;
+}
+
+export function parseStagingRequest(text, { requestRunId, repository }) {
+  let payload;
+  try {
+    payload = JSON.parse(requireValue(text, 'Staging request'));
+  } catch (error) {
+    throw new Error(`Invalid Staging request JSON: ${error instanceof Error ? error.message : error}`);
+  }
+  const prNumber = parsePrNumber(payload?.prNumber);
+  const expectedRunId = requireValue(requestRunId, 'STAGING_REQUEST_RUN_ID');
+  if (String(payload?.requestRunId ?? '') !== expectedRunId) {
+    throw new Error('Staging request run ID does not match the triggering workflow run.');
+  }
+  if (payload?.repository !== repository) {
+    throw new Error('Staging request repository does not match GITHUB_REPOSITORY.');
+  }
+  if (payload?.ref !== 'refs/heads/main') {
+    throw new Error('Staging request must originate from main.');
+  }
+  return prNumber;
 }
 
 export function validateDeployablePullRequest(pullRequest, repository) {
@@ -39,9 +59,11 @@ export function validateDeployablePullRequest(pullRequest, repository) {
 }
 
 export function newerManualRunExists(currentRunId, workflowRuns) {
-  const current = BigInt(requireValue(currentRunId, 'GITHUB_RUN_ID'));
+  const current = BigInt(requireValue(currentRunId, 'request run ID'));
   return workflowRuns.some((run) => {
-    if (run?.event !== 'workflow_dispatch' || run?.id == null) return false;
+    if (run?.event !== 'workflow_dispatch' || run?.head_branch !== MAIN_BRANCH || run?.id == null) {
+      return false;
+    }
     try {
       return BigInt(String(run.id)) > current;
     } catch {
@@ -85,11 +107,7 @@ export function createGitHubClient({ token, repository, apiUrl = 'https://api.gi
     const text = await response.text();
     let payload = null;
     if (text) {
-      try {
-        payload = JSON.parse(text);
-      } catch {
-        payload = text;
-      }
+      try { payload = JSON.parse(text); } catch { payload = text; }
     }
     if (!response.ok) {
       const detail = typeof payload === 'object' && payload?.message ? payload.message : String(payload ?? response.statusText);
@@ -108,7 +126,7 @@ export function createGitHubClient({ token, repository, apiUrl = 'https://api.gi
     },
     async listManualRuns(workflowFile) {
       const payload = await request(
-        `${repoPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?event=workflow_dispatch&per_page=100`,
+        `${repoPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?event=workflow_dispatch&branch=${encodeURIComponent(MAIN_BRANCH)}&per_page=100`,
       );
       return Array.isArray(payload?.workflow_runs) ? payload.workflow_runs : [];
     },
@@ -145,44 +163,26 @@ async function isSuperseded(client, workflowFile, runId) {
   return newerManualRunExists(runId, runs);
 }
 
-export async function deployToStaging({
-  client,
-  repository,
-  prNumber,
-  workflowFile,
-  runId,
-  githubRef,
-  stagingUrl,
-  runGit = defaultRunGit,
-}) {
-  if (githubRef !== 'refs/heads/main') {
-    throw new Error('Run this workflow from the main branch only.');
-  }
+export async function deployToStaging({ client, repository, prNumber, workflowFile, runId, githubRef, runGit = defaultRunGit }) {
+  if (githubRef !== 'refs/heads/main') throw new Error('Privileged Staging publisher must run from main.');
 
   const initialPr = await client.getPullRequest(prNumber);
   const targetSha = validateDeployablePullRequest(initialPr, repository);
-
-  if (await isSuperseded(client, workflowFile, runId)) {
-    return { status: 'superseded', targetSha };
-  }
+  if (await isSuperseded(client, workflowFile, runId)) return { status: 'superseded', targetSha };
 
   await fetchCommit(runGit, targetSha);
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    if (await isSuperseded(client, workflowFile, runId)) {
-      return { status: 'superseded', targetSha };
-    }
+    if (await isSuperseded(client, workflowFile, runId)) return { status: 'superseded', targetSha };
 
     const latestPr = await client.getPullRequest(prNumber);
     const latestSha = validateDeployablePullRequest(latestPr, repository);
     if (latestSha !== targetSha) {
-      throw new Error(`PR HEAD changed while preparing Staging: ${targetSha} -> ${latestSha}. Run the workflow again.`);
+      throw new Error(`PR HEAD changed while preparing Staging: ${targetSha} -> ${latestSha}. Run the request again.`);
     }
 
     const expectedStagingSha = await client.getRef(STAGING_BRANCH);
-    if (expectedStagingSha === targetSha) {
-      return { status: 'deployed', targetSha, alreadyCurrent: true };
-    }
+    if (expectedStagingSha === targetSha) return { status: 'deployed', targetSha, alreadyCurrent: true };
 
     if (runGit(buildStagingPushArgs(targetSha, expectedStagingSha))) {
       const verified = await client.getRef(STAGING_BRANCH);
@@ -191,28 +191,16 @@ export async function deployToStaging({
     }
 
     const afterFailure = await client.getRef(STAGING_BRANCH);
-    if (afterFailure === targetSha) {
-      return { status: 'deployed', targetSha, alreadyCurrent: true };
-    }
+    if (afterFailure === targetSha) return { status: 'deployed', targetSha, alreadyCurrent: true };
     if (attempt === 3) {
       throw new Error('Staging changed concurrently three times; no unsafe force update was attempted without a lease.');
     }
   }
-
   throw new Error('Unexpected Staging deployment state.');
 }
 
-export async function cleanupStaging({
-  client,
-  repository,
-  closedPrNumber,
-  closedPrHeadRepo,
-  closedPrHeadSha,
-  runGit = defaultRunGit,
-}) {
-  if (closedPrHeadRepo !== repository) {
-    return { status: 'skipped-fork' };
-  }
+export async function cleanupStaging({ client, repository, closedPrNumber, closedPrHeadRepo, closedPrHeadSha, runGit = defaultRunGit }) {
+  if (closedPrHeadRepo !== repository) return { status: 'skipped-fork' };
 
   const prHeadSha = assertSha(closedPrHeadSha, 'closed PR HEAD SHA');
   const currentStagingSha = await client.getRef(STAGING_BRANCH);
@@ -225,9 +213,7 @@ export async function cleanupStaging({
 
   if (!runGit(buildStagingPushArgs(mainSha, prHeadSha))) {
     const afterFailure = await client.getRef(STAGING_BRANCH);
-    if (afterFailure !== prHeadSha) {
-      return { status: 'skipped-race', currentStagingSha: afterFailure };
-    }
+    if (afterFailure !== prHeadSha) return { status: 'skipped-race', currentStagingSha: afterFailure };
     throw new Error(`Failed to reset Staging for closed PR #${closedPrNumber}; Staging still points to ${prHeadSha}.`);
   }
 
@@ -239,46 +225,42 @@ export async function cleanupStaging({
 async function main() {
   const command = process.argv[2];
   const repository = requireValue(process.env.GITHUB_REPOSITORY, 'GITHUB_REPOSITORY');
-  const client = createGitHubClient({
-    token: process.env.GH_TOKEN,
-    repository,
-    apiUrl: process.env.GITHUB_API_URL,
-  });
+  const client = createGitHubClient({ token: process.env.GH_TOKEN, repository, apiUrl: process.env.GITHUB_API_URL });
 
   if (command === 'deploy') {
-    const prNumber = parsePrNumber(process.env.PR_NUMBER);
+    const requestRunId = requireValue(process.env.STAGING_REQUEST_RUN_ID, 'STAGING_REQUEST_RUN_ID');
+    const requestFile = requireValue(process.env.STAGING_REQUEST_FILE, 'STAGING_REQUEST_FILE');
+    const prNumber = parseStagingRequest(readFileSync(requestFile, 'utf8'), { requestRunId, repository });
     const stagingUrl = requireValue(process.env.STAGING_URL, 'STAGING_URL');
-    const workflowFile = requireValue(process.env.STAGING_WORKFLOW_FILE, 'STAGING_WORKFLOW_FILE');
-    const runId = requireValue(process.env.GITHUB_RUN_ID, 'GITHUB_RUN_ID');
+    const workflowFile = requireValue(process.env.STAGING_REQUEST_WORKFLOW_FILE, 'STAGING_REQUEST_WORKFLOW_FILE');
     const result = await deployToStaging({
       client,
       repository,
       prNumber,
       workflowFile,
-      runId,
+      runId: requestRunId,
       githubRef: process.env.GITHUB_REF,
-      stagingUrl,
     });
 
     if (result.status === 'superseded') {
-      console.log(`A newer manual Staging request exists; run ${runId} will not move Staging.`);
+      console.log(`A newer main-branch Staging request exists; request ${requestRunId} will not move Staging.`);
       await writeSummary([
         '## Fixed Staging',
         '',
-        `Run ${runId} was superseded by a newer manual request.`,
-        'No Staging ref change was made by this run.',
+        `Request run ${requestRunId} was superseded by a newer main-branch request.`,
+        'No Staging ref change was made by this publisher run.',
       ]);
       return;
     }
 
-    const runUrl = `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${runId}`;
+    const runUrl = `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${requestRunId}`;
     const comment = [
       'Fixed Staging updated.',
       '',
       `- URL: ${stagingUrl}`,
       `- PR: #${prNumber}`,
       `- SHA: \`${result.targetSha}\``,
-      `- Workflow: ${runUrl}`,
+      `- Request workflow: ${runUrl}`,
       '',
       'This moves only the `staging` branch pointer. Vercel Git Integration performs the actual deployment.',
     ].join('\n');
@@ -295,6 +277,7 @@ async function main() {
       `- PR: #${prNumber}`,
       `- SHA: \`${result.targetSha}\``,
       `- URL: ${stagingUrl}`,
+      `- Request run: ${requestRunId}`,
     ]);
     console.log(`Staging now points to ${result.targetSha}.`);
     return;
