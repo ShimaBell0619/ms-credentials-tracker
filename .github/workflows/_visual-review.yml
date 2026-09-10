@@ -1,4 +1,4 @@
-name: Temporary UI visual review
+name: Temporary UI visual review (responsive rerun)
 
 on:
   push:
