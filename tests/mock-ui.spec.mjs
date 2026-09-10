@@ -102,17 +102,17 @@ function storedEnvelope() {
 }
 
 for (const viewport of viewports) {
-  test(`${viewport.name}: empty local-data UI renders without horizontal overflow`, async ({ page }) => {
+  test(`${viewport.name}: empty local-data UI shows onboarding without dashboard clutter`, async ({ page }) => {
     await freezeDate(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: '資格の更新予定' })).toBeVisible();
-    await expect(page.getByText('基準日 2026.09.08')).toBeVisible();
-    await expect(page.getByText('Local data', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '資格情報を取り込んで始める' })).toBeVisible();
     await expect(page.getByRole('button', { name: '資格を取り込む' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '資格一覧' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'データと連携' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '90日スケジュール' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '資格一覧' })).toHaveCount(0);
+    await expect(page.getByText('このブラウザに保存', { exact: false }).first()).toBeVisible();
 
     const widths = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
@@ -136,6 +136,63 @@ test('derived status meaning is available as text', async ({ page }) => {
   await expect(page.getByText('AZ-104 有効期限').first()).toBeVisible();
 });
 
+test('expired-only data is surfaced as attention required instead of no upcoming deadline', async ({ page }) => {
+  await freezeDate(page);
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ms-credentials-tracker:credentials:v1',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'test:expired-az500',
+            credentialDefinitionId: 'cert.azure-security-engineer-associate',
+            source: 'learnTranscriptPdf',
+            sourceRecordId: null,
+            sourceTitle: 'AZ-500',
+            firstEarnedOn: '2025-01-01',
+            currentExpiresOn: '2026-08-01',
+            confirmedAt: '2026-09-08T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: '期限切れの資格があります' })).toBeVisible();
+  await expect(page.getByText('1件が期限切れです。', { exact: false })).toBeVisible();
+  await expect(page.getByText('今後の有効期限はありません')).toHaveCount(0);
+});
+
+test('non-expiring-only data is explicitly identified as not requiring renewal', async ({ page }) => {
+  await freezeDate(page);
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ms-credentials-tracker:credentials:v1',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'test:az900',
+            credentialDefinitionId: 'cert.azure-fundamentals',
+            source: 'learnTranscriptPdf',
+            sourceRecordId: null,
+            sourceTitle: 'AZ-900',
+            firstEarnedOn: '2025-01-01',
+            currentExpiresOn: null,
+            confirmedAt: '2026-09-08T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: '更新が必要な資格はありません' })).toBeVisible();
+  await expect(page.getByText('登録済み1件は、いずれも期限のない資格です。')).toBeVisible();
+});
+
 test('90-day month scale uses calendar-day proportions and keeps deadline pins in the correct month', async ({ page }) => {
   await freezeDate(page);
   await page.addInitScript((data) => {
@@ -150,12 +207,14 @@ test('90-day month scale uses calendar-day proportions and keeps deadline pins i
   const november = await monthLabels.filter({ hasText: '11月' }).boundingBox();
   const december = await monthLabels.filter({ hasText: '12月' }).boundingBox();
   const deadlinePin = await page.locator('.timeline-pin-deadline').first().boundingBox();
+  const renewalPin = await page.locator('.timeline-pin-renewal').first().boundingBox();
 
   expect(september).not.toBeNull();
   expect(october).not.toBeNull();
   expect(november).not.toBeNull();
   expect(december).not.toBeNull();
   expect(deadlinePin).not.toBeNull();
+  expect(renewalPin).not.toBeNull();
 
   expect(october.width).toBeGreaterThan(september.width);
   expect(november.width).toBeGreaterThan(december.width);
@@ -187,7 +246,7 @@ test('Transcript PDF import updates the live credential projection and persists 
   ]);
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'まだ資格データがありません' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '資格情報を取り込んで始める' })).toBeVisible();
   await page.getByRole('button', { name: '資格を取り込む' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -210,7 +269,7 @@ test('Transcript PDF import updates the live credential projection and persists 
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
   await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
-  await expect(page.locator('.saved-count')).toContainText('1');
+  await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
   await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
@@ -220,7 +279,7 @@ test('Transcript PDF import updates the live credential projection and persists 
   expect(stored.credentials[0].source).toBe('learnTranscriptPdf');
 
   await page.reload();
-  await expect(page.locator('.saved-count')).toContainText('1');
+  await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
 });
 
