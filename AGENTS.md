@@ -1,7 +1,7 @@
 # Agent Instructions — Microsoft Credentials Tracker
 
-Foundation-Version: 0.7.0
-Foundation-Commit: c968b8af1f666d8f6024cd9e292c91cbf631fefe
+Foundation-Version: 0.7.1
+Foundation-Commit: 4e8d704865b429cfa8d94631d34f93cb3b4ad44c
 
 ## Read order
 
@@ -36,12 +36,14 @@ If implementation discovery expands into another material area, route and load t
 
 ## Context-routed Chat implementation
 
-For material Chat-based work, follow the adopted Foundation v0.7.0 profile:
+For material Chat-based work, follow the adopted Foundation v0.7.1 profile:
 
 - build a session-local Repository Context Packet from the Issue/AC, base SHA, routed contracts, relevant implementation/tests, and Foundation provenance;
 - extract change-specific Design Intent before implementation: requested delta, must preserve, may change, must not change, responsibility/trust boundaries, validation requirements, and explicit non-goals;
 - map each material contract/AC to its implementation surface and validation evidence before the first write;
 - use a Bootstrap Read once, then Incremental Read for corrections and newly affected routes instead of repeatedly loading unchanged contracts;
+- retain and reuse revision-bound evidence and known resource/run identifiers while they remain valid; refresh mutable state when current-state, write, staleness, or rerouting conditions require it;
+- when existing behavior is expected to be preserved but validation evidence is missing, add or run the smallest focused proof before changing stable production code when practical; missing evidence is not itself a defect;
 - batch related GitHub reads and coherent writes when practical while preserving expected-HEAD checks, conflict reconciliation, security boundaries, and validation;
 - self-review the final diff against the same Design Intent before completion.
 
