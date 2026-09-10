@@ -27,6 +27,16 @@ function storedEnvelope() {
   };
 }
 
+async function openCalendarDialog(page) {
+  await page.getByRole('button', { name: 'データと連携' }).click();
+  const dataDialog = page.getByRole('dialog', { name: 'データと連携' });
+  await expect(dataDialog).toBeVisible();
+  await dataDialog.getByRole('button', { name: 'Googleカレンダー' }).click();
+  const calendarDialog = page.getByRole('dialog', { name: 'Googleカレンダー同期' });
+  await expect(calendarDialog).toBeVisible();
+  return calendarDialog;
+}
+
 for (const viewport of viewports) {
   test(`${viewport.name}: Google Calendar sync setup remains usable without OAuth config`, async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-09-08T12:00:00Z'));
@@ -36,14 +46,8 @@ for (const viewport of viewports) {
     }, storedEnvelope());
     await page.goto('/');
 
-    const trigger = page.getByRole('button', { name: 'Googleカレンダー' });
-    await expect(trigger).toBeVisible();
-    await expect(page.getByRole('banner').getByText('未同期', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('今月と予定').getByText('未同期', { exact: true })).toBeVisible();
-    await trigger.click();
-
-    const dialog = page.getByRole('dialog', { name: 'Googleカレンダー同期' });
-    await expect(dialog).toBeVisible();
+    const dialog = await openCalendarDialog(page);
+    await expect(dialog.getByText('未接続', { exact: true }).first()).toBeVisible();
     await expect(dialog.getByText('1資格 · 2予定')).toBeVisible();
     await expect(dialog.getByText('28日前・7日前・当日')).toBeVisible();
     await expect(dialog.getByText('VITE_GOOGLE_CLIENT_ID')).toBeVisible();
@@ -57,7 +61,7 @@ for (const viewport of viewports) {
   });
 }
 
-test('marks cleanup as unsynchronized when the last desired Calendar events disappear', async ({ page }) => {
+test('marks cleanup as changed when the last desired Calendar events disappear', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-09-08T12:00:00Z'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
@@ -78,6 +82,6 @@ test('marks cleanup as unsynchronized when the last desired Calendar events disa
   });
   await page.goto('/');
 
-  await expect(page.getByRole('button', { name: 'カレンダーを更新' })).toBeVisible();
-  await expect(page.getByRole('banner').getByText('未同期', { exact: true })).toBeVisible();
+  const dialog = await openCalendarDialog(page);
+  await expect(dialog.getByText('変更あり', { exact: true }).first()).toBeVisible();
 });
