@@ -5,13 +5,11 @@ import { CredentialStatus } from './CredentialStatus';
 export function CredentialRegister({ credentials }: { credentials: CredentialProjection[] }) {
   return (
     <section id="credentials" className="scroll-mt-20" aria-labelledby="credentials-title">
-      <div className="mb-4">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-          {credentials.length} credentials
-        </p>
-        <h2 id="credentials-title" className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+      <div className="mb-4 flex items-baseline gap-2">
+        <h2 id="credentials-title" className="text-xl font-semibold tracking-tight text-foreground">
           資格一覧
         </h2>
+        <span className="text-sm font-medium text-muted">{credentials.length}件</span>
       </div>
 
       {credentials.length > 0 ? (
