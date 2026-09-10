@@ -1,15 +1,23 @@
 # Foundation provenance
 
-- Adopted Foundation version: 0.7.2
-- Foundation commit: `976421d0a88e059e60cfb71b86542d27640ae151`
+- Adopted Foundation version: 0.8.1
+- Foundation commit: `9061ea222e5e6bba1197b03088c6cb2c13f7e0c4`
 - Reusable workflow commit: `c968b8af1f666d8f6024cd9e292c91cbf631fefe`
 - Adopted on: 2026-09-11
 
-The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.7.2 does not change the reusable Web CI contract. v0.7.2 hardens the copied Fixed Staging publisher and release-preparation discipline, so those changes are adopted deliberately without moving an unrelated workflow SHA solely for version conformity.
+The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.8.1 does not change the reusable Web CI contract. This adoption carries forward the v0.8.0 Vercel-first hosting contract and deliberately adopts the v0.8.1 Fixed Staging publisher correction and Application Release hardening without moving an unrelated workflow SHA solely for version conformity.
+
+## v0.8.1 adoption impact
+
+- GitHub Pages remains retired; Vercel Git Integration remains the deployment provider for Production, Preview, and the fixed `staging` slot.
+- The Fixed Staging publisher no longer compares dynamic `workflow_run.name` / `run-name` text with the static request workflow identity; the `workflow_run.workflows` selector remains the workflow-identity boundary and the existing event, success, `main`, and same-repository checks remain intact.
+- The Application Release workflow now resolves the actual tag object to the validated commit SHA, validates published/prerelease state, handles concurrent publication idempotently, and verifies final release state after publication.
+- Production remains `https://credentials.shimabell.dev`; Fixed Staging remains `https://staging.credentials.shimabell.dev`; ordinary Pull Requests continue to use Vercel Preview URLs.
+- No application runtime, product behavior, Web CI pin, Fixed Staging request/cleanup semantics, or deployment provider changes are part of this adoption.
 
 ## Adopted AI implementation profile
 
-- Normal Chat-based material changes use the v0.7.2 context-routed implementation profile.
+- Normal Chat-based material changes use the v0.8.1 context-routed implementation profile.
 - `AGENTS.md` owns the repository-specific Context Routing index; matching routes are additive and point to the actual normative specialist documents in this repository.
 - Repository contracts remain the source of truth. The Repository Context Packet is session-local working state only and must not become a duplicate permanent context document.
 - Before implementation, extract change-specific Design Intent and map material contracts / Acceptance Criteria to implementation surfaces and validation evidence.
@@ -21,7 +29,7 @@ The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit beca
 
 ## UI-standard trial boundary
 
-PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.2. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.7.2 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
+PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.8.1. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.8.1 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
 
 ## Adopted optional profiles
 
@@ -40,12 +48,14 @@ PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.7.2
 - `staging` remains a mutable one-PR verification slot and is not a merge, release, or history branch.
 - Cleanup uses the closed PR HEAD SHA as slot ownership evidence, so a stale close event cannot clear a newer occupant and PR retargeting does not strand the slot.
 - Vercel Git Integration remains the deployment owner after GitHub moves the `staging` ref.
-- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the Foundation v0.7.2 correction.
+- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the correction introduced in Foundation v0.7.2 and retained in v0.8.1.
+- Static request workflow identity is selected by `on.workflow_run.workflows`; dynamic `run-name` text is not used as an additional runtime identity check.
 
 ### Application GitHub Releases
 
 - Versioned GitHub Releases are published only after successful `main` CI.
 - The app-owned `.github/workflows/release.yml` remains aligned with the adopted application-release profile and binds tags/releases to `workflow_run.head_sha`.
+- Existing tags are resolved through tag objects to the actual commit before success is accepted; published/prerelease state and final post-publication state are verified.
 - Application version intent remains the root `package.json` version change.
 
 ## Adopted engineering/review rules
