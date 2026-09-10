@@ -24,7 +24,7 @@ const textClass: Record<CredentialDerivedStatus, string> = {
 
 export function CredentialStatus({ status }: { status: CredentialDerivedStatus }) {
   return (
-    <span className={cn('inline-flex items-center gap-2 text-sm font-medium', textClass[status])}>
+    <span className={cn('inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium', textClass[status])}>
       <span className={cn('size-2 shrink-0 rounded-full', dotClass[status])} aria-hidden="true" />
       {statusText[status]}
     </span>

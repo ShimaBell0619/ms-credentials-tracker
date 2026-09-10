@@ -60,7 +60,7 @@ export default function App() {
             <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary-soft font-mono text-sm font-bold text-primary">
               C
             </span>
-            <span className="min-w-0">
+            <span className="hidden min-w-0 sm:block">
               <strong className="block truncate text-sm font-semibold tracking-tight text-foreground">Credentials</strong>
               <span className="hidden text-xs text-muted sm:block">Microsoft certification tracker</span>
             </span>
