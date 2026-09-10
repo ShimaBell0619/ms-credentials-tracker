@@ -74,7 +74,7 @@ function storedEnvelope() {
         sourceRecordId: null,
         sourceTitle: 'AZ-305',
         firstEarnedOn: '2024-06-28',
-        currentExpiresOn: '2027-06-29',
+        currentExpiresOn: '2027-03-15',
         confirmedAt: '2026-09-08T00:00:00.000Z',
       },
       {
@@ -193,7 +193,7 @@ test('non-expiring-only data is explicitly identified as not requiring renewal',
   await expect(page.getByText('登録済み1件は、いずれも期限のない資格です。')).toBeVisible();
 });
 
-test('90-day month scale uses calendar-day proportions and keeps deadline pins in the correct month', async ({ page }) => {
+test('90-day month scale uses calendar-day proportions and styles renewal and deadline pins', async ({ page }) => {
   await freezeDate(page);
   await page.addInitScript((data) => {
     window.localStorage.setItem('ms-credentials-tracker:credentials:v1', JSON.stringify(data));
@@ -206,22 +206,27 @@ test('90-day month scale uses calendar-day proportions and keeps deadline pins i
   const october = await monthLabels.filter({ hasText: '10月' }).boundingBox();
   const november = await monthLabels.filter({ hasText: '11月' }).boundingBox();
   const december = await monthLabels.filter({ hasText: '12月' }).boundingBox();
-  const deadlinePin = await page.locator('.timeline-pin-deadline').first().boundingBox();
-  const renewalPin = await page.locator('.timeline-pin-renewal').first().boundingBox();
+  const deadlinePin = page.locator('.timeline-pin-deadline').first();
+  const renewalPin = page.locator('.timeline-pin-renewal').first();
+  const deadlineBox = await deadlinePin.boundingBox();
+  const renewalBox = await renewalPin.boundingBox();
 
   expect(september).not.toBeNull();
   expect(october).not.toBeNull();
   expect(november).not.toBeNull();
   expect(december).not.toBeNull();
-  expect(deadlinePin).not.toBeNull();
-  expect(renewalPin).not.toBeNull();
+  expect(deadlineBox).not.toBeNull();
+  expect(renewalBox).not.toBeNull();
 
   expect(october.width).toBeGreaterThan(september.width);
   expect(november.width).toBeGreaterThan(december.width);
 
-  const pinCenter = deadlinePin.x + deadlinePin.width / 2;
+  const pinCenter = deadlineBox.x + deadlineBox.width / 2;
   expect(pinCenter).toBeGreaterThanOrEqual(november.x);
   expect(pinCenter).toBeLessThanOrEqual(november.x + november.width);
+
+  const renewalBackground = await renewalPin.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(renewalBackground).not.toBe('rgba(0, 0, 0, 0)');
 });
 
 test('keyboard focus is visible on the skip link', async ({ page }) => {
@@ -269,14 +274,17 @@ test('Transcript PDF import updates the live credential projection and persists 
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
   await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
-  await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
-  await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
   const stored = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v2')),
   );
   expect(stored.credentials[0].source).toBe('learnTranscriptPdf');
+
+  await dialog.getByRole('button', { name: '閉じる' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
+  await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
+  await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
