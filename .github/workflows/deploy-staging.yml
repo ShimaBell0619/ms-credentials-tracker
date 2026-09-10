@@ -11,6 +11,7 @@ permissions:
 concurrency:
   group: fixed-staging-deploy-slot
   cancel-in-progress: false
+  queue: max
 
 jobs:
   deploy:
