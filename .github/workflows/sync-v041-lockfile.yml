@@ -1,0 +1,52 @@
+name: Sync v0.4.1 lockfile metadata
+
+on:
+  push:
+    branches: [fix/harden-fixed-staging]
+    paths:
+      - .github/workflows/sync-v041-lockfile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout release candidate branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/harden-fixed-staging
+          fetch-depth: 1
+
+      - name: Synchronize lockfile root version only
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          if (pkg.version !== '0.4.1') throw new Error(`expected package version 0.4.1, got ${pkg.version}`);
+          lock.version = pkg.version;
+          lock.packages[''].version = pkg.version;
+          fs.writeFileSync('package-lock.json', `${JSON.stringify(lock, null, 2)}\n`);
+          NODE
+
+          changed="$(git diff --name-only)"
+          if [[ "$changed" != 'package-lock.json' ]]; then
+            echo "unexpected generated changes: $changed" >&2
+            exit 1
+          fi
+
+      - name: Commit synchronized metadata and remove helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/sync-v041-lockfile.yml
+          git add package-lock.json
+          git commit -m 'chore: sync v0.4.1 lockfile metadata'
+          git push origin HEAD:fix/harden-fixed-staging
