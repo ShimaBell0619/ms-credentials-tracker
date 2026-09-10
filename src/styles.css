@@ -151,16 +151,12 @@
   box-shadow: 0 0 0 1px var(--color-border-strong);
 }
 
-.timeline-pin-renewalOpen {
+.timeline-pin-renewal {
   background: var(--color-primary);
 }
 
 .timeline-pin-deadline {
   background: var(--color-warning);
-}
-
-.google-calendar-host > .local-calendar-content {
-  display: none;
 }
 
 @media (max-width: 390px) {
