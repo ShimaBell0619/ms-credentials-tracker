@@ -10,12 +10,43 @@ async function openTranscriptDialog(page) {
   return { trigger, dialog };
 }
 
+async function openDataAndIntegrationsDialog(page) {
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: 'データと連携' });
+  await trigger.focus();
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'データと連携' });
+  await expect(dialog).toBeVisible();
+  return { trigger, dialog };
+}
+
 test('Base UI dialog preserves Escape dismissal and focus return', async ({ page }) => {
   const { trigger, dialog } = await openTranscriptDialog(page);
 
   await page.keyboard.press('Escape');
 
   await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('Data and integrations dialog preserves Escape dismissal and focus return', async ({ page }) => {
+  const { trigger, dialog } = await openDataAndIntegrationsDialog(page);
+
+  await page.keyboard.press('Escape');
+
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('Google Calendar dialog restores focus to the utility entry after close', async ({ page }) => {
+  const { trigger, dialog: dataDialog } = await openDataAndIntegrationsDialog(page);
+  await dataDialog.getByRole('button', { name: 'Googleカレンダー' }).click();
+  const calendarDialog = page.getByRole('dialog', { name: 'Googleカレンダー同期' });
+  await expect(calendarDialog).toBeVisible();
+
+  await page.keyboard.press('Escape');
+
+  await expect(calendarDialog).toBeHidden();
   await expect(trigger).toBeFocused();
 });
 
