@@ -1,0 +1,47 @@
+name: README GIF Preview
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - scripts/capture-readme-gif.mjs
+      - src/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/readme-gif-preview.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request commit
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate README GIF
+        run: npm run docs:gif
+
+      - name: Upload README GIF
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: readme-overview
+          path: docs/assets/readme-overview.gif
+          if-no-files-found: error
