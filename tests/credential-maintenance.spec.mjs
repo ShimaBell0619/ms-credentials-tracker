@@ -151,6 +151,68 @@ test('an unresolved Transcript credential can be explicitly mapped before confir
   await dialog.getByLabel('この資格を手動で照合').selectOption('cert.azure-administrator-associate');
   await expect(dialog.getByText('照合済み', { exact: true }).first()).toBeVisible();
   await dialog.getByRole('button', { name: '確認して保存' }).click();
-  await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
+  await expect(dialog).toBeHidden();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
+});
+
+test('Transcript reconciliation conflict keeps the modal open and preserves the manual override', async ({ page }) => {
+  await freezeDate(page);
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ms-credentials-tracker:credentials:v2',
+      JSON.stringify({
+        version: 2,
+        history: [],
+        credentials: [
+          {
+            id: 'learn:BFC4DD-8BDAB2',
+            credentialDefinitionId: 'cert.azure-administrator-associate',
+            source: 'manual',
+            sourceRecordId: 'BFC4DD-8BDAB2',
+            sourceTitle: 'Microsoft Certified: Azure Administrator Associate',
+            firstEarnedOn: '2026-03-14',
+            currentExpiresOn: '2027-04-01',
+            confirmedAt: '2026-09-07T00:00:00.000Z',
+            lastTranscriptConfirmedOn: '2026-09-01',
+            manualOverrideAt: '2026-09-07T00:00:00.000Z',
+            archivedAt: null,
+          },
+        ],
+      }),
+    );
+  });
+  const transcriptPdf = buildTextPdf([
+    'Transcript',
+    'Active certifications',
+    'Certification title Certification number Earned on Expires on',
+    'Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027',
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'データと連携' }).click();
+  const integrationsDialog = page.getByRole('dialog');
+  await integrationsDialog.getByRole('button', { name: 'Transcriptを取り込む' }).click();
+  const dialog = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: '資格情報を取り込む' }),
+  });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Transcript PDF').setInputFiles({
+    name: 'transcript.pdf',
+    mimeType: 'application/pdf',
+    buffer: transcriptPdf,
+  });
+  await dialog.getByRole('button', { name: 'PDFを解析する' }).click();
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: '確認して保存' }).click();
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('1件は手動修正と競合しました');
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+
+  const stored = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v2')),
+  );
+  expect(stored.credentials[0].currentExpiresOn).toBe('2027-04-01');
+  expect(stored.credentials[0].manualOverrideAt).toBe('2026-09-07T00:00:00.000Z');
 });
