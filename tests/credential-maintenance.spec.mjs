@@ -189,8 +189,13 @@ test('Transcript reconciliation conflict keeps the modal open and preserves the 
   ]);
 
   await page.goto('/');
-  await page.getByRole('button', { name: '資格を取り込む' }).click();
-  const dialog = page.getByRole('dialog');
+  await page.getByRole('button', { name: 'データと連携' }).click();
+  const integrationsDialog = page.getByRole('dialog');
+  await integrationsDialog.getByRole('button', { name: 'Transcriptを取り込む' }).click();
+  const dialog = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: '資格情報を取り込む' }),
+  });
+  await expect(dialog).toBeVisible();
   await dialog.getByLabel('Transcript PDF').setInputFiles({
     name: 'transcript.pdf',
     mimeType: 'application/pdf',
