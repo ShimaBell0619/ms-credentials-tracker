@@ -273,15 +273,13 @@ test('Transcript PDF import updates the live credential projection and persists 
   );
 
   await dialog.getByRole('button', { name: '確認して保存' }).click();
-  await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
+  await expect(dialog).toBeHidden();
 
   const stored = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem('ms-credentials-tracker:credentials:v2')),
   );
   expect(stored.credentials[0].source).toBe('learnTranscriptPdf');
 
-  await dialog.getByRole('button', { name: '閉じる' }).click();
-  await expect(dialog).toBeHidden();
   await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
   await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
@@ -289,6 +287,50 @@ test('Transcript PDF import updates the live credential projection and persists 
   await page.reload();
   await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
+});
+
+test('Transcript save failure keeps the modal open with the review state visible', async ({ page }) => {
+  await freezeDate(page);
+  const transcriptPdf = buildTextPdf([
+    'Transcript',
+    'Active certifications',
+    'Certification title Certification number Earned on Expires on',
+    'Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027',
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: '資格を取り込む' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Transcript PDF').setInputFiles({
+    name: 'transcript.pdf',
+    mimeType: 'application/pdf',
+    buffer: transcriptPdf,
+  });
+  await dialog.getByRole('button', { name: 'PDFを解析する' }).click();
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+  await expect(dialog.locator('.candidate-title strong')).toHaveText(
+    'Microsoft Certified: Azure Administrator Associate',
+  );
+
+  await page.evaluate(() => {
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key === 'ms-credentials-tracker:credentials:v2') {
+        throw new DOMException('Simulated storage failure', 'QuotaExceededError');
+      }
+      return originalSetItem.call(this, key, value);
+    };
+  });
+
+  await dialog.getByRole('button', { name: '確認して保存' }).click();
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText('資格情報を保存できませんでした');
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+  await expect(dialog.locator('.candidate-title strong')).toHaveText(
+    'Microsoft Certified: Azure Administrator Associate',
+  );
+  await expect(page.locator('.credential-table')).toHaveCount(0);
 });
 
 test('Transcript PDF import rejects non-PDF files', async ({ page }) => {
@@ -304,6 +346,7 @@ test('Transcript PDF import rejects non-PDF files', async ({ page }) => {
   });
   await dialog.getByRole('button', { name: 'PDFを解析する' }).click();
 
+  await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('alert')).toContainText('PDF ファイルを選択');
   await expect(dialog.getByRole('heading', { name: '解析結果' })).toHaveCount(0);
 });
