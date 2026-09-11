@@ -11,6 +11,7 @@ import {
 } from '../storage/local-credential-store.ts';
 import {
   extractTranscriptPdfText,
+  MAX_TRANSCRIPT_PDF_PAGES,
   TranscriptPdfReadException,
   type TranscriptPdfReadError,
 } from '../transport/transcript-pdf.ts';
@@ -62,7 +63,7 @@ function pdfErrorMessage(error: TranscriptPdfReadError): string {
     case 'passwordProtected':
       return 'パスワードで保護された PDF は読み込めません。';
     case 'tooManyPages':
-      return 'PDF のページ数が多すぎます。Microsoft Learn の Transcript PDF を選択してください。';
+      return `PDF は ${MAX_TRANSCRIPT_PDF_PAGES}ページ以下にしてください。Microsoft Learn の Transcript PDF を選択してください。`;
     case 'noText':
       return 'PDF からテキストを抽出できませんでした。画像化された PDF は現在対象外です。';
     case 'textTooLarge':
@@ -211,7 +212,15 @@ export function TranscriptImport() {
             <p className="text-xs font-semibold text-primary">Microsoft Learn Transcript</p>
             <DialogTitle>資格情報を取り込む</DialogTitle>
             <DialogDescription>
-              Microsoft Learn の Transcript を「印刷 → PDFとして保存」して選択します。PDF はこのブラウザ内だけで解析し、外部へアップロードしません。
+              <a
+                className="font-medium text-primary underline underline-offset-2"
+                href="https://learn.microsoft.com/users/me/transcript"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Microsoft Learn の Transcript
+              </a>
+              を開き、「印刷 → PDFとして保存」して選択します。PDF はこのブラウザ内だけで解析し、外部へアップロードしません。
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -227,7 +236,9 @@ export function TranscriptImport() {
               accept=".pdf,application/pdf"
               onChange={(event) => selectFile(event.currentTarget.files?.[0] ?? null)}
             />
-            <small className="text-xs leading-5 text-muted">最大 10 MB。テキストを含む PDF が対象です。</small>
+            <small className="text-xs leading-5 text-muted">
+              最大 {MAX_TRANSCRIPT_PDF_PAGES}ページ / 10 MB。テキストを含む PDF が対象です。
+            </small>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
