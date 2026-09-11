@@ -184,7 +184,7 @@ export function TranscriptImport() {
       if (saved.unchangedCount > 0) parts.push(`${saved.unchangedCount}件を再確認`);
       if (saved.conflictCount > 0) parts.push(`${saved.conflictCount}件は手動修正と競合`);
       setMessage(parts.length > 0 ? `${parts.join('、')}しました。` : '保存できる資格はありませんでした。');
-      setOpen(false);
+      if (saved.conflictCount === 0) setOpen(false);
     } catch {
       setSaveError('資格情報を保存できませんでした。ブラウザのストレージを確認して、もう一度お試しください。');
     }
