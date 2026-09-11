@@ -8,6 +8,8 @@ A personal web app for tracking Microsoft credential renewal windows, expiry dat
 
 > The overview uses deterministic sample data. It is not live Microsoft account data.
 
+The main view is intentionally date-led: it shows the credential that needs attention first, then the 90-day renewal/expiry schedule, followed by the full credential register. Transcript import and Google Calendar synchronization stay under the compact **Data and integrations** entry instead of occupying permanent dashboard space.
+
 ## How to use
 
 1. Sign in to Microsoft Learn and open your [Transcript](https://learn.microsoft.com/users/me/transcript).
@@ -30,10 +32,11 @@ Clearing browser storage or switching browsers/devices will therefore remove or 
 
 ## Features
 
+- attention-first current state for expired, renewable, and upcoming credentials
+- proportional 90-day schedule for renewal openings and expiry deadlines
+- full credential register with desktop and mobile layouts
 - Microsoft Learn Transcript PDF import and review before saving
 - renewal-window, expiry, and non-expiring status projection
-- next-deadline and 90-day schedule views
-- current-month and upcoming credential markers
 - explicit one-way synchronization to a dedicated Google Calendar
 - responsive browser UI suitable for desktop and mobile use
 
