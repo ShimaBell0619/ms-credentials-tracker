@@ -91,6 +91,7 @@ export function TranscriptImport() {
   );
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [diagnostics, setDiagnostics] = useState<TranscriptDiagnostics | null>(null);
   const [resolutionMap, setResolutionMap] = useState<Record<string, string>>({});
@@ -118,6 +119,7 @@ export function TranscriptImport() {
   function openDialog() {
     setMessage(null);
     setLoadError(null);
+    setSaveError(null);
     setOpen(true);
   }
 
@@ -125,6 +127,7 @@ export function TranscriptImport() {
     const handleOpen = () => {
       setMessage(null);
       setLoadError(null);
+      setSaveError(null);
       setOpen(true);
     };
     window.addEventListener(OPEN_TRANSCRIPT_IMPORT_EVENT, handleOpen);
@@ -137,6 +140,7 @@ export function TranscriptImport() {
     setPageCount(null);
     setMessage(null);
     setLoadError(null);
+    setSaveError(null);
     setDiagnostics(null);
     setResolutionMap({});
   }
@@ -145,6 +149,7 @@ export function TranscriptImport() {
     if (!file) return;
     setMessage(null);
     setLoadError(null);
+    setSaveError(null);
     setResult(null);
     setPageCount(null);
     setDiagnostics(null);
@@ -166,15 +171,23 @@ export function TranscriptImport() {
 
   function confirmImport() {
     if (!result) return;
-    const saved = saveConfirmedCredentialCandidates(effectiveCandidates, 'learnTranscriptPdf');
-    setSavedCount(saved.credentials.filter((credential) => !credential.archivedAt).length);
+    setMessage(null);
+    setSaveError(null);
 
-    const parts: string[] = [];
-    if (saved.addedCount > 0) parts.push(`${saved.addedCount}件を追加`);
-    if (saved.updatedCount > 0) parts.push(`${saved.updatedCount}件を更新`);
-    if (saved.unchangedCount > 0) parts.push(`${saved.unchangedCount}件を再確認`);
-    if (saved.conflictCount > 0) parts.push(`${saved.conflictCount}件は手動修正と競合`);
-    setMessage(parts.length > 0 ? `${parts.join('、')}しました。` : '保存できる資格はありませんでした。');
+    try {
+      const saved = saveConfirmedCredentialCandidates(effectiveCandidates, 'learnTranscriptPdf');
+      setSavedCount(saved.credentials.filter((credential) => !credential.archivedAt).length);
+
+      const parts: string[] = [];
+      if (saved.addedCount > 0) parts.push(`${saved.addedCount}件を追加`);
+      if (saved.updatedCount > 0) parts.push(`${saved.updatedCount}件を更新`);
+      if (saved.unchangedCount > 0) parts.push(`${saved.unchangedCount}件を再確認`);
+      if (saved.conflictCount > 0) parts.push(`${saved.conflictCount}件は手動修正と競合`);
+      setMessage(parts.length > 0 ? `${parts.join('、')}しました。` : '保存できる資格はありませんでした。');
+      setOpen(false);
+    } catch {
+      setSaveError('資格情報を保存できませんでした。ブラウザのストレージを確認して、もう一度お試しください。');
+    }
   }
 
   return (
@@ -365,6 +378,12 @@ export function TranscriptImport() {
                 確認して保存
               </Button>
             </div>
+
+            {saveError ? (
+              <p className="mt-4 rounded-md border border-danger/20 bg-danger-soft px-3 py-2 text-sm leading-6 text-danger" role="alert">
+                {saveError}
+              </p>
+            ) : null}
 
             {message ? (
               <p className="mt-4 rounded-md border border-success/20 bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">
