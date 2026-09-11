@@ -4,7 +4,7 @@ import { validateTranscriptPdfFile } from '../domain/transcript-pdf.ts';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-export const MAX_TRANSCRIPT_PDF_PAGES = 20;
+export const MAX_TRANSCRIPT_PDF_PAGES = 50;
 export const MAX_TRANSCRIPT_PDF_TEXT_CHARS = 1_000_000;
 
 export type TranscriptPdfReadError =

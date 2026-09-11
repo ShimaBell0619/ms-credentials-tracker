@@ -14,8 +14,8 @@ function pdfEscape(value) {
   return value.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)');
 }
 
-function buildTextPdf(lines) {
-  const content = [
+function buildTextPdf(lines, pageCount = 1) {
+  const firstPageContent = [
     'BT',
     '/F1 9 Tf',
     '48 770 Td',
@@ -26,14 +26,24 @@ function buildTextPdf(lines) {
     ]),
     'ET',
   ].join('\n');
+  const emptyPageContent = 'BT\nET';
+  const pageObjectIds = Array.from({ length: pageCount }, (_, index) => 3 + index * 2);
+  const fontObjectId = 3 + pageCount * 2;
 
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(content, 'ascii')} >>\nstream\n${content}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`,
   ];
+
+  pageObjectIds.forEach((pageObjectId, index) => {
+    const contentObjectId = pageObjectId + 1;
+    const content = index === 0 ? firstPageContent : emptyPageContent;
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
+      `<< /Length ${Buffer.byteLength(content, 'ascii')} >>\nstream\n${content}\nendstream`,
+    );
+  });
+  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
 
   let pdf = '%PDF-1.4\n%1234\n';
   const offsets = [0];
@@ -258,6 +268,11 @@ test('Transcript PDF import updates the live credential projection and persists 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: '資格情報を取り込む' })).toBeVisible();
   await expect(dialog.getByText('外部へアップロードしません')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Microsoft Learn の Transcript' })).toHaveAttribute(
+    'href',
+    'https://learn.microsoft.com/users/me/transcript',
+  );
+  await expect(dialog.getByText('最大 50ページ / 10 MB。', { exact: false })).toBeVisible();
 
   await dialog.getByLabel('Transcript PDF').setInputFiles({
     name: 'transcript.pdf',
@@ -281,12 +296,42 @@ test('Transcript PDF import updates the live credential projection and persists 
   expect(stored.credentials[0].source).toBe('learnTranscriptPdf');
 
   await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
+  await expect(page.getByText('期限が近い資格を優先表示しています。')).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
   await expect(page.getByText('AZ-104 更新開始').first()).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole('heading', { name: '更新状況' })).toBeVisible();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
+});
+
+test('Transcript PDF import accepts a 22-page full export', async ({ page }) => {
+  await freezeDate(page);
+  const transcriptPdf = buildTextPdf(
+    [
+      'Transcript',
+      'Active certifications',
+      'Certification title Certification number Earned on Expires on',
+      'Microsoft Certified: Azure Administrator Associate BFC4DD-8BDAB2 Mar 14, 2026 Mar 15, 2027',
+    ],
+    22,
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: '資格を取り込む' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Transcript PDF').setInputFiles({
+    name: 'full-transcript.pdf',
+    mimeType: 'application/pdf',
+    buffer: transcriptPdf,
+  });
+  await dialog.getByRole('button', { name: 'PDFを解析する' }).click();
+
+  await expect(dialog.getByRole('heading', { name: '解析結果' })).toBeVisible();
+  await expect(dialog.getByText('Import candidates · 22ページ')).toBeVisible();
+  await expect(dialog.locator('.candidate-title strong')).toHaveText(
+    'Microsoft Certified: Azure Administrator Associate',
+  );
 });
 
 test('Transcript save failure keeps the modal open with the review state visible', async ({ page }) => {

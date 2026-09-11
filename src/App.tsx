@@ -131,7 +131,7 @@ export default function App() {
                   >
                     更新状況
                   </h1>
-                  <p className="mt-1 text-sm text-muted">次に必要な対応と期限を確認します。</p>
+                  <p className="mt-1 text-sm text-muted">期限が近い資格を優先表示しています。</p>
                 </div>
                 <p className="font-mono text-xs text-muted">
                   基準日 <time dateTime={referenceDate}>{formatReferenceDate(referenceDate)}</time>
