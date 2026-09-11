@@ -151,6 +151,6 @@ test('an unresolved Transcript credential can be explicitly mapped before confir
   await dialog.getByLabel('この資格を手動で照合').selectOption('cert.azure-administrator-associate');
   await expect(dialog.getByText('照合済み', { exact: true }).first()).toBeVisible();
   await dialog.getByRole('button', { name: '確認して保存' }).click();
-  await expect(dialog.getByText('1件を追加しました。')).toBeVisible();
+  await expect(dialog).toBeHidden();
   await expect(page.locator('.credential-table').getByText('AZ-104')).toBeVisible();
 });
