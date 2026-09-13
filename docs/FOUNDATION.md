@@ -1,75 +1,72 @@
 # Foundation provenance
 
-- Adopted Foundation version: 0.8.1
-- Foundation commit: `9061ea222e5e6bba1197b03088c6cb2c13f7e0c4`
-- Reusable workflow commit: `c968b8af1f666d8f6024cd9e292c91cbf631fefe`
-- Adopted on: 2026-09-11
+- Adopted Foundation version: 0.10.0
+- Foundation commit: `007352e15fcc6f9620686d3b77e11e85341eac02`
+- Reusable workflow commit: `007352e15fcc6f9620686d3b77e11e85341eac02`
+- Adopted on: 2026-09-13
 
-The reusable Web CI pin intentionally remains on the reviewed v0.7.0 commit because Foundation v0.8.1 does not change the reusable Web CI contract. This adoption carries forward the v0.8.0 Vercel-first hosting contract and deliberately adopts the v0.8.1 Fixed Staging publisher correction and Application Release hardening without moving an unrelated workflow SHA solely for version conformity.
+## v0.10.0 adoption impact
 
-## v0.8.1 adoption impact
+Foundation v0.10.0 changes the normal Vercel hosted-review path from automatic per-PR deployment to explicit On-demand Preview while retaining Fixed Staging as an optional stable-origin profile.
 
-- GitHub Pages remains retired; Vercel Git Integration remains the deployment provider for Production, Preview, and the fixed `staging` slot.
-- The Fixed Staging publisher no longer compares dynamic `workflow_run.name` / `run-name` text with the static request workflow identity; the `workflow_run.workflows` selector remains the workflow-identity boundary and the existing event, success, `main`, and same-repository checks remain intact.
-- The Application Release workflow now resolves the actual tag object to the validated commit SHA, validates published/prerelease state, handles concurrent publication idempotently, and verifies final release state after publication.
-- Production remains `https://credentials.shimabell.dev`; Fixed Staging remains `https://staging.credentials.shimabell.dev`; ordinary Pull Requests continue to use Vercel Preview URLs.
-- No application runtime, product behavior, Web CI pin, Fixed Staging request/cleanup semantics, or deployment provider changes are part of this adoption.
+This application adopts both profiles:
 
-## Adopted AI implementation profile
+- ordinary feature/fix/PR branches are deployment-disabled;
+- an eligible repository writer comments `/preview` to request normal hosted review;
+- `preview/pr-N` is the only trusted synthetic Preview source used for generated Vercel Preview URLs;
+- `staging` remains the fixed-origin verification slot for Google OAuth and other exact-Origin checks;
+- `main` remains Production.
 
-- Normal Chat-based material changes use the v0.8.1 context-routed implementation profile.
-- `AGENTS.md` owns the repository-specific Context Routing index; matching routes are additive and point to the actual normative specialist documents in this repository.
-- Repository contracts remain the source of truth. The Repository Context Packet is session-local working state only and must not become a duplicate permanent context document.
-- Before implementation, extract change-specific Design Intent and map material contracts / Acceptance Criteria to implementation surfaces and validation evidence.
-- Prefer one Bootstrap Read followed by Incremental Reads, and batch coherent GitHub reads/writes and CI phases without weakening expected-HEAD checks, conflict handling, security, self-review, or final validation.
-- Reuse revision-bound evidence and known resource/run identifiers while they remain valid; refresh mutable state when current-state, write, staleness, or rerouting conditions require it.
-- When an existing behavior is expected to remain unchanged but proof is missing, use the smallest focused validation that can distinguish an evidence gap from a production defect before altering stable production code when practical.
-- Apply the Foundation complexity discipline: do not introduce abstractions, dependencies, layers, workflows, configuration formats, compatibility adapters, or permanent process artifacts without a current objective or real boundary.
-- Stable consumer code is not migrated solely to conform to a newer Foundation default.
+The repository-owned Vercel policy uses slash-safe `"**": false` and explicitly enables only `main`, `preview/**`, and `staging`.
 
-## UI-standard trial boundary
+## On-demand Preview
 
-PR #50 is consumer evidence for a candidate UI standard beyond Foundation v0.8.1. Its Base UI, semantic runtime-token, OKLCH, CSS-first motion, and reduced-motion findings are not claimed as released v0.8.1 Foundation UI requirements. The product-specific palette, typography, timeline, information hierarchy, density, spacing, and composition remain application-owned.
+The copied v0.10.0 workflow/helper follows the released trust contract:
 
-## Adopted optional profiles
+1. `/preview` must be an exact comment by a repository writer on an open same-repository PR targeting `main`.
+2. The exact PR HEAD A is validated with the reusable Foundation Web CI pinned to the recorded release SHA, including this application's E2E contract.
+3. Trusted default-branch automation revalidates the PR and creates a synthetic child B where `parent(B)=A`, `tree(B)=tree(A)`, and the diff is empty.
+4. Vercel Git Integration deploys `preview/pr-N`.
+5. A `vercel.deployment.success` repository-dispatch event is accepted only after project/ref/SHA/PR/provenance validation; the real generated `*.vercel.app` application URL is then posted to the PR.
+6. Closing the PR removes only the matching Foundation-owned synthetic Preview branch using force-with-lease protection.
 
-### Vercel Git Integration
+No Vercel API token or Deploy Hook is introduced. Generated Preview origins are not registered with Google OAuth and are therefore not the verification surface for exact-Origin OAuth behavior.
 
-- Consumer quality gates use the Foundation `web-ci.yml` workflow pinned to the recorded reusable-workflow commit SHA.
-- Hosting deployment is delegated to Vercel Git Integration rather than a privileged GitHub Actions publisher.
-- Pushes to `main` are the Production deployment path; feature branches and Pull Requests are the Preview deployment path.
-- The repository does not duplicate Vercel Preview deployment with a custom GitHub Actions workflow.
-- `vercel.json` matches the adopted Foundation Vite SPA fallback template and remains application-owned.
+## Fixed Staging
 
-### Fixed Staging
+Fixed Staging remains required by this application because Google OAuth authorizes the stable origin `https://staging.credentials.shimabell.dev`.
 
-- Fixed Staging follows the adopted Foundation read-only request -> trusted `workflow_run` publisher -> compare-and-swap ref update model.
-- Only open same-repository PRs targeting `main` are eligible; selected PR code is never checked out or executed in a write-enabled GitHub publisher job.
-- `staging` remains a mutable one-PR verification slot and is not a merge, release, or history branch.
-- Cleanup uses the closed PR HEAD SHA as slot ownership evidence, so a stale close event cannot clear a newer occupant and PR retargeting does not strand the slot.
-- Vercel Git Integration remains the deployment owner after GitHub moves the `staging` ref.
-- The publisher keeps runner-scoped request-file paths at step scope so `${{ runner.temp }}` is evaluated only after a runner exists, matching the correction introduced in Foundation v0.7.2 and retained in v0.8.1.
-- Static request workflow identity is selected by `on.workflow_run.workflows`; dynamic `run-name` text is not used as an additional runtime identity check.
+The four copied Fixed Staging assets are aligned to the v0.10.0 hardened contract. The existing request workflow already matched the released template byte-for-byte and therefore required no source change; the publisher, cleanup workflow, and helper were upgraded together.
 
-### Application GitHub Releases
+The hardened flow:
 
-- Versioned GitHub Releases are published only after successful `main` CI.
-- The app-owned `.github/workflows/release.yml` remains aligned with the adopted application-release profile and binds tags/releases to `workflow_run.head_sha`.
-- Existing tags are resolved through tag objects to the actual commit before success is accepted; published/prerelease state and final post-publication state are verified.
-- Application version intent remains the root `package.json` version change.
+- resolves the requested open same-repository PR and exact HEAD A from the read-only request artifact;
+- runs the pinned Foundation Web CI against A before mutation;
+- creates a content-identical synthetic child B carrying explicit `Foundation-Fixed-Staging-PR` and `Source-PR-HEAD` ownership markers;
+- moves `staging` to B with force-with-lease and serialized `fixed-staging-deploy-slot` concurrency;
+- revalidates PR state/HEAD immediately before mutation and rejects superseded requests;
+- resets `staging` to current `main` on PR close only when the current synthetic commit still carries the closing PR's ownership marker.
 
-## Adopted engineering/review rules
+The app-specific configuration-location deviation is preserved: the canonical Staging URL remains directly owned by this app's publisher as `https://staging.credentials.shimabell.dev`; a `FIXED_STAGING_URL` repository variable is not introduced solely for Foundation conformity.
 
-- Mandatory implementation-agent self-review remains separate from risk-based independent review.
-- Codex GitHub Code Review is manual and selective; Automatic Review remains off.
-- Every `@codex review` invocation, including re-review, requires a concrete rationale, risk category, expected review value, and explicit user/maintainer approval before execution.
-- Independent review focuses on high-impact contract, regression, trust-boundary, state-integrity, concurrency, compatibility, CI/CD, deployment, rollback, and operational failure risks rather than lint/style noise.
+## Application-specific boundaries
 
-## App-specific deviations
+- Production remains `https://credentials.shimabell.dev`.
+- Fixed Staging remains `https://staging.credentials.shimabell.dev`.
+- Production and Fixed Staging intentionally use the same browser-visible Google OAuth Client ID but remain separate browser origins.
+- Browser-local credential data and Google Calendar metadata remain origin-local; this adoption changes no product data model or persistence behavior.
+- GitHub Pages remains retired.
+- Vercel Git Integration remains the deployment provider; GitHub Actions selects trusted source refs and performs quality validation but does not call the Vercel deployment API.
+- Application GitHub Release semantics are unchanged.
 
-- Browser-rendered E2E remains enabled in the shared Web CI because it is part of this application's quality contract.
-- Azure OIDC is not an active application deployment/runtime profile. The owner-wide Flexible FIC was validated separately during Foundation development, but this repository does not retain a privileged Azure workflow after that validation completed.
-- Vercel deployment status and Foundation CI remain independently visible; Vercel Git Integration may begin Production deployment before post-merge CI for the exact Production SHA finishes.
-- The Fixed Staging publisher keeps the canonical URL `https://staging.credentials.shimabell.dev` directly in the app-owned workflow instead of reading Foundation's optional `FIXED_STAGING_URL` repository variable. This is a configuration-location deviation only; the trust, request validation, concurrency, CAS, and cleanup contracts remain aligned with the adopted profile.
+## Validation requirement
 
-Copied Foundation rules/templates do not update automatically. Foundation upgrades must review the Foundation changelog/diff, preserve approved app-specific deviations, update copied contracts deliberately, update reusable-workflow SHAs only after review, and refresh this provenance record.
+The adoption is complete only after post-merge evidence proves all active paths:
+
+1. an ordinary slash-containing branch receives no Vercel deployment/status;
+2. `/preview` validates exact source and returns the real generated Preview URL;
+3. Fixed Staging deploys the validated source through the stable staging origin and preserves ownership/cleanup semantics;
+4. `main` continues to deploy successfully to Production;
+5. normal CI/E2E succeeds on the merge candidate and final `main` SHA.
+
+Copied Foundation rules/templates do not update automatically. Future upgrades must review the released Foundation diff, preserve application-specific product/design/OAuth decisions, and update copied contracts deliberately.
