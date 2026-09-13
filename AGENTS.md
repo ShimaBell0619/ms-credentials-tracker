@@ -1,7 +1,7 @@
 # Agent Instructions — Microsoft Credentials Tracker
 
-Foundation-Version: 0.8.1
-Foundation-Commit: 9061ea222e5e6bba1197b03088c6cb2c13f7e0c4
+Foundation-Version: 0.10.0
+Foundation-Commit: 007352e15fcc6f9620686d3b77e11e85341eac02
 
 ## Read order
 
@@ -36,7 +36,7 @@ If implementation discovery expands into another material area, route and load t
 
 ## Context-routed Chat implementation
 
-For material Chat-based work, follow the adopted Foundation v0.8.1 profile:
+For material Chat-based work, follow the adopted Foundation v0.10.0 profile:
 
 - build a session-local Repository Context Packet from the Issue/AC, base SHA, routed contracts, relevant implementation/tests, and Foundation provenance;
 - extract change-specific Design Intent before implementation: requested delta, must preserve, may change, must not change, responsibility/trust boundaries, validation requirements, and explicit non-goals;
