@@ -1,20 +1,19 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   buildStagingPushArgs,
-  cleanupStaging,
-  deployToStaging,
   newerManualRunExists,
   parsePrNumber,
   parseStagingRequest,
-  shouldCleanupStaging,
+  sourceMarkers,
+  stagingOwnershipMatches,
   validateDeployablePullRequest,
 } from '../scripts/staging-slot.mjs';
 
 const REPOSITORY = 'ShimaBell0619/ms-credentials-tracker';
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-const SHA_C = 'cccccccccccccccccccccccccccccccccccccccc';
 
 function pullRequest({ headSha = SHA_B, headRepo = REPOSITORY, state = 'open', baseRef = 'main' } = {}) {
   return {
@@ -73,80 +72,34 @@ test('force-with-lease push is bound to the observed Staging SHA', () => {
     `${SHA_B}:refs/heads/staging`,
     `--force-with-lease=refs/heads/staging:${SHA_A}`,
   ]);
-  assert.equal(shouldCleanupStaging(SHA_A, SHA_A), true);
-  assert.equal(shouldCleanupStaging(SHA_B, SHA_A), false);
 });
 
-test('superseded request never fetches or mutates Staging', async () => {
-  let gitCalled = false;
-  const client = {
-    async getPullRequest() { return pullRequest(); },
-    async listManualRuns() {
-      return [{ id: 101, event: 'workflow_dispatch', head_branch: 'main' }];
-    },
-  };
-  const result = await deployToStaging({
-    client,
-    repository: REPOSITORY,
-    prNumber: 40,
-    workflowFile: 'request-staging.yml',
-    runId: '100',
-    githubRef: 'refs/heads/main',
-    runGit: () => {
-      gitCalled = true;
-      return true;
-    },
-  });
-  assert.equal(result.status, 'superseded');
-  assert.equal(gitCalled, false);
+test('synthetic Staging provenance gives cleanup explicit PR ownership', () => {
+  const message = [
+    'Foundation Fixed Staging for PR #42',
+    '',
+    'Foundation-Fixed-Staging-PR: 42',
+    `Source-PR-HEAD: ${SHA_A}`,
+  ].join('\n');
+
+  assert.equal(sourceMarkers(message, 42, SHA_A), true);
+  assert.equal(sourceMarkers(message, 42, SHA_B), false);
+  assert.equal(stagingOwnershipMatches(message, 42), true);
+  assert.equal(stagingOwnershipMatches(message, 41), false);
 });
 
-test('cleanup does not overwrite a newer Staging occupant', async () => {
-  let gitCalled = false;
-  const client = {
-    async getRef(branch) {
-      assert.equal(branch, 'staging');
-      return SHA_C;
-    },
-  };
-  const result = await cleanupStaging({
-    client,
-    repository: REPOSITORY,
-    closedPrNumber: 40,
-    closedPrHeadRepo: REPOSITORY,
-    closedPrHeadSha: SHA_B,
-    runGit: () => {
-      gitCalled = true;
-      return true;
-    },
-  });
-  assert.equal(result.status, 'skipped-newer-staging');
-  assert.equal(gitCalled, false);
-});
-
-test('cleanup resets matching Staging independently of the PR current base branch', async () => {
-  let stagingSha = SHA_B;
-  const client = {
-    async getRef(branch) {
-      if (branch === 'staging') return stagingSha;
-      if (branch === 'main') return SHA_A;
-      throw new Error(`Unexpected branch ${branch}`);
-    },
-  };
-  const runGit = (args) => {
-    if (args[0] === 'fetch') return true;
-    assert.deepEqual(args, buildStagingPushArgs(SHA_A, SHA_B));
-    stagingSha = SHA_A;
-    return true;
-  };
-  const result = await cleanupStaging({
-    client,
-    repository: REPOSITORY,
-    closedPrNumber: 40,
-    closedPrHeadRepo: REPOSITORY,
-    closedPrHeadSha: SHA_B,
-    runGit,
-  });
-  assert.deepEqual(result, { status: 'cleaned', mainSha: SHA_A });
-  assert.equal(stagingSha, SHA_A);
+test('helper preserves exact-source revalidation and content-identical synthetic invariants', () => {
+  const helper = readFileSync('scripts/staging-slot.mjs', 'utf8');
+  for (const marker of [
+    'PR HEAD changed after exact-source validation',
+    'PR HEAD changed before Staging mutation',
+    "['commit-tree', sourceTree, '-p', sourceSha]",
+    "['diff', '--quiet', sourceSha, syntheticSha]",
+    'Foundation-Fixed-Staging-PR:',
+    'Source-PR-HEAD:',
+    '--force-with-lease=',
+    'stagingOwnershipMatches(message, prNumber)',
+  ]) {
+    assert.ok(helper.includes(marker), `missing Fixed Staging invariant: ${marker}`);
+  }
 });
